@@ -198,25 +198,37 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
     }
 
     /**
-     * @notice mint new FLOOR using excess reserves
-     * @param _recipient address
-     * @param _amount uint256
+     * @notice Claim rewards from a Liquidity Staking vault on NFTX
+     * @param _liquidityStaking address
+     * @param _vaultId uint256
+     * @param _rewardToken address
      */
     function claimNFTXRewards(address _liquidityStaking, uint256 _vaultId, address _rewardToken) external {
+        require(permissions[STATUS.ALLOCATOR][msg.sender], notApproved);
+        require(permissions[STATUS.XTOKEN][_rewardToken], notAccepted);
+
+        // Get the reward token held in the treasury before our claim
         uint256 previousBalance = IERC20(_rewardToken).balanceOf(address(this));
 
+        // Claim rewards from the NFTX vault
         INFTXLPStaking(_liquidityStaking).claimRewards(_vaultId);
 
+        // Get our updated balance after claiming rewards
         uint256 newBalance = IERC20(_rewardToken).balanceOf(address(this));
 
-        if (newBalance == previousBalance) {
+        // If our balance has not changed, we don't need to process further
+        if (newBalance <= previousBalance) {
             return;
         }
 
-        totalReserves = totalReserves.add(previousBalance - newBalance);
+        uint256 balanceDifference = previousBalance - newBalance;
 
-        uint256 value = tokenValue(_rewardToken, balance);
-        emit Deposit(_token, _amount, value);
+        // Update our total reserves based on the updated balance
+        totalReserves = totalReserves.add(balanceDifference);
+
+        // Emit our Deposit event
+        uint256 value = tokenValue(_rewardToken, balanceDifference);
+        emit Deposit(_rewardToken, balanceDifference, value);
     }
 
     /**

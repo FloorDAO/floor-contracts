@@ -96,7 +96,7 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
      * @notice claims rewards from the vault.
      */
 
-    function harvestAll(address _token) override external {
+    function harvestAll(address _token) override external onlyPolicy {
         // We only want to allow harvesting from a specified liquidity pool mapping
         require(stakingTokenInfo[_token].exists, "Unsupported token");
         require(stakingTokenInfo[_token].isLiquidityPool, "Must be liquidity staking token");
