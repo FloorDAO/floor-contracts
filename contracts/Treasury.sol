@@ -223,11 +223,11 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
 
         uint256 balanceDifference = previousBalance - newBalance;
 
-        // Update our total reserves based on the updated balance
-        totalReserves = totalReserves.add(balanceDifference);
-
         // Emit our Deposit event
         uint256 value = tokenValue(_rewardToken, balanceDifference);
+
+        // Update our total reserves based on the updated balance
+        totalReserves = totalReserves.add(value);
         emit Deposit(_rewardToken, balanceDifference, value);
     }
 
