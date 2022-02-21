@@ -205,7 +205,7 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
      */
     function claimNFTXRewards(address _liquidityStaking, uint256 _vaultId, address _rewardToken) external override {
         require(permissions[STATUS.ALLOCATOR][msg.sender], notApproved);
-        require(permissions[STATUS.XTOKEN][_rewardToken], notAccepted);
+        require(permissions[STATUS.RESERVETOKEN][_rewardToken], notAccepted);
 
         // Get the reward token held in the treasury before our claim
         uint256 previousBalance = IERC20(_rewardToken).balanceOf(address(this));
