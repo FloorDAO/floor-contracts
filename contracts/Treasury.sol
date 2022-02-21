@@ -203,7 +203,7 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
      * @param _vaultId uint256
      * @param _rewardToken address
      */
-    function claimNFTXRewards(address _liquidityStaking, uint256 _vaultId, address _rewardToken) external {
+    function claimNFTXRewards(address _liquidityStaking, uint256 _vaultId, address _rewardToken) external override {
         require(permissions[STATUS.ALLOCATOR][msg.sender], notApproved);
         require(permissions[STATUS.XTOKEN][_rewardToken], notAccepted);
 

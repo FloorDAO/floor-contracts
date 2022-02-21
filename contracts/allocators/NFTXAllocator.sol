@@ -103,7 +103,7 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
 
         // Send a request to the treasury to claim rewards from the NFTX liquidity staking pool
         treasury.claimNFTXRewards(
-            liquidityStaking.address,
+            address(liquidityStaking),
             stakingTokenInfo[_token].vaultId,
             stakingTokenInfo[_token].rewardToken
         );

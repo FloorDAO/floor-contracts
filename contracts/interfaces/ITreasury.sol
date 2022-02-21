@@ -20,6 +20,8 @@ interface ITreasury {
 
     function allocatorManage(address _token, uint256 _amount) external;
 
+    function claimNFTXRewards(address _liquidityStaking, uint256 _vaultId, address _rewardToken) external;
+
     function incurDebt(uint256 amount_, address token_) external;
 
     function repayDebtWithReserve(uint256 amount_, address token_) external;

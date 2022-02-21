@@ -11,6 +11,7 @@ import "../interfaces/IFLOOR.sol";
 import "../interfaces/IsFLOOR.sol";
 import "../interfaces/IBondingCalculator.sol";
 import "../interfaces/ITreasury.sol";
+import "../interfaces/INFTXLPStaking.sol";
 
 import "../types/FloorAccessControlled.sol";
 
@@ -201,6 +202,40 @@ contract TreasuryMock is FloorAccessControlled, ITreasury {
         }
         IERC20(_token).safeTransfer(msg.sender, _amount);
         emit AllocatorManaged(_token, _amount);
+    }
+
+    /**
+     * @notice Claim rewards from a Liquidity Staking vault on NFTX
+     * @param _liquidityStaking address
+     * @param _vaultId uint256
+     * @param _rewardToken address
+     */
+    function claimNFTXRewards(address _liquidityStaking, uint256 _vaultId, address _rewardToken) external override {
+        require(permissions[STATUS.ALLOCATOR][msg.sender], notApproved);
+        require(permissions[STATUS.XTOKEN][_rewardToken], notAccepted);
+
+        // Get the reward token held in the treasury before our claim
+        uint256 previousBalance = IERC20(_rewardToken).balanceOf(address(this));
+
+        // Claim rewards from the NFTX vault
+        INFTXLPStaking(_liquidityStaking).claimRewards(_vaultId);
+
+        // Get our updated balance after claiming rewards
+        uint256 newBalance = IERC20(_rewardToken).balanceOf(address(this));
+
+        // If our balance has not changed, we don't need to process further
+        if (newBalance <= previousBalance) {
+            return;
+        }
+
+        uint256 balanceDifference = previousBalance - newBalance;
+
+        // Update our total reserves based on the updated balance
+        totalReserves = totalReserves.add(balanceDifference);
+
+        // Emit our Deposit event
+        uint256 value = tokenValue(_rewardToken, balanceDifference);
+        emit Deposit(_rewardToken, balanceDifference, value);
     }
 
     /**
