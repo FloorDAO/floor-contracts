@@ -43,7 +43,6 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
     struct dividendTokenData {
         address underlying; // stakingToken
         address xToken; // dividendToken
-        uint256 deployed;
         bool exists;
     }
 
@@ -102,33 +101,12 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
         require(stakingTokenInfo[_token].exists, "Unsupported token");
         require(stakingTokenInfo[_token].isLiquidityPool, "Must be liquidity staking token");
 
-        // Get the Treasury's balance of the xToken
-        uint256 xTokenBalance = IERC20(dividendTokenInfo[_token].xToken).balanceOf(address(treasury));
-
-        // Retrieve full balance of xToken from treasury, decreasing total reserves
-        treasury.allocatorManage(dividendTokenInfo[_token].xToken, xTokenBalance);
-
-        // Trigger our rewards to be claimed
-        liquidityStaking.claimRewards(stakingTokenInfo[_token].vaultId);
-
-        // Get the reward token for this stakingToken
-        address _rewardToken = stakingTokenInfo[_token].rewardToken;
-        
-        // Deposit the harvested rewards into the treasury
-        uint256 balance = IERC20(_rewardToken).balanceOf(address(this));
-        uint256 value = treasury.tokenValue(_rewardToken, balance);
-
-        // Approve and deposit asset into treasury
-        IERC20(_rewardToken).approve(address(treasury), balance);
-
-        // Pass the tokenValue as profit to stop the treasury minting FLOOR
-        treasury.deposit(balance, _rewardToken, value);
-
-        // Deposit the xToken back into the treasury, increasing total reserves and minting 0 FLOOR
-        uint256 xTokenValue = treasury.tokenValue(dividendTokenInfo[_token].xToken, xTokenBalance);
-
-        IERC20(dividendTokenInfo[_token].xToken).approve(address(treasury), xTokenBalance);
-        treasury.deposit(xTokenBalance, dividendTokenInfo[_token].xToken, xTokenValue);
+        // Send a request to the treasury to claim rewards from the NFTX liquidity staking pool
+        treasury.claimNFTXRewards(
+            liquidityStaking.address,
+            stakingTokenInfo[_token].vaultId,
+            stakingTokenInfo[_token].rewardToken
+        );
     }
 
 
@@ -176,9 +154,6 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
             IERC20(_token).approve(address(inventoryStaking), _amount);
             inventoryStaking.deposit(stakingTokenInfo[_token].vaultId, _amount);
         }
-
-        // Account for deposit
-        accountingFor(_token, _amount, true);
     }
 
     /**
@@ -213,9 +188,6 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
         treasury.deposit(balance, _token, value);
 
         emit TreasuryAssetReturned(_token, balance, value);
-
-        // Account for withdrawal
-        accountingFor(_token, balance, false);
     }
 
     /**
@@ -251,7 +223,6 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
         dividendTokenInfo[_token] = dividendTokenData({
             underlying: _token,
             xToken: _xToken,
-            deployed: 0,
             exists: true
         });
     }
@@ -278,26 +249,6 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
 
     function removeStakingToken(address _token) external override onlyPolicy {
         delete stakingTokenInfo[_token];
-    }
-
-
-    /**
-     * @notice accounting of deposit / withdrawal of assets.
-     */
-
-    function accountingFor(
-        address token,
-        uint256 amount,
-        bool add
-    ) internal {
-        if (add) {
-            // track amount allocated into pool
-            dividendTokenInfo[token].deployed = dividendTokenInfo[token].deployed.add(amount);
-        }
-        else {
-            // track amount allocated into pool
-            dividendTokenInfo[token].deployed = (amount < dividendTokenInfo[token].deployed) ? dividendTokenInfo[token].deployed.sub(amount) : 0;
-        }
     }
 
 }

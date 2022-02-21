@@ -11,6 +11,7 @@ import "./interfaces/IFLOOR.sol";
 import "./interfaces/IsFLOOR.sol";
 import "./interfaces/IBondingCalculator.sol";
 import "./interfaces/ITreasury.sol";
+import "./interfaces/INFTXLPStaking.sol";
 
 import "./types/FloorAccessControlled.sol";
 
@@ -194,6 +195,28 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
         }
         IERC20(_token).safeTransfer(msg.sender, _amount);
         emit AllocatorManaged(_token, _amount);
+    }
+
+    /**
+     * @notice mint new FLOOR using excess reserves
+     * @param _recipient address
+     * @param _amount uint256
+     */
+    function claimNFTXRewards(address _liquidityStaking, uint256 _vaultId, address _rewardToken) external {
+        uint256 previousBalance = IERC20(_rewardToken).balanceOf(address(this));
+
+        INFTXLPStaking(_liquidityStaking).claimRewards(_vaultId);
+
+        uint256 newBalance = IERC20(_rewardToken).balanceOf(address(this));
+
+        if (newBalance == previousBalance) {
+            return;
+        }
+
+        totalReserves = totalReserves.add(previousBalance - newBalance);
+
+        uint256 value = tokenValue(_rewardToken, balance);
+        emit Deposit(_token, _amount, value);
     }
 
     /**
