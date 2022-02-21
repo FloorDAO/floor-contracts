@@ -197,7 +197,7 @@ describe("NFTX Allocator Logic", function () {
 
   it("Should be able to harvest all rewards against a token", async function () {
     // Approve our reward token in the treasury
-    await treasury.enable(12, rewardToken.address, bondingCalculator.address); // XTOKEN
+    await treasury.enable(2, rewardToken.address, bondingCalculator.address);  // RESERVETOKEN
     await treasury.enable(13, allocator.address, bondingCalculator.address);   // ALLOCATOR
 
     // Set up an inventory and liquidity pool vaults
