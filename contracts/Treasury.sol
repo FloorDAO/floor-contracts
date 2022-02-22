@@ -191,8 +191,6 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
      * @param _tokenId uint256
      */
     function depositERC721(address _token, uint256 _tokenId) external override {
-        require(permissions[STATUS.RESERVEDEPOSITOR][msg.sender], notApproved);
-
         IERC721(_token).transferFrom(msg.sender, address(this), _tokenId);
         emit DepositERC721(_token, _tokenId);
     }

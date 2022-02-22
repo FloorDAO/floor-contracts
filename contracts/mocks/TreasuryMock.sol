@@ -198,8 +198,6 @@ contract TreasuryMock is FloorAccessControlled, ITreasury {
      * @param _tokenId uint256
      */
     function depositERC721(address _token, uint256 _tokenId) external override {
-        require(permissions[STATUS.RESERVEDEPOSITOR][msg.sender], notApproved);
-
         IERC721(_token).transferFrom(msg.sender, address(this), _tokenId);
         emit DepositERC721(_token, _tokenId);
     }
@@ -210,7 +208,10 @@ contract TreasuryMock is FloorAccessControlled, ITreasury {
      * @param _tokenId uint256
      */
     function withdrawERC721(address _token, uint256 _tokenId) external override onlyGovernor {
-        IERC721(_token).transferFrom(address(this), msg.sender, _tokenId);
+        IERC721 erc721 = IERC721(_token);
+        erc721.approve(msg.sender, _tokenId);
+        erc721.transferFrom(address(this), msg.sender, _tokenId);
+
         emit WithdrawERC721(_token, _tokenId);
     }
 
