@@ -72,11 +72,11 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
      */
 
     constructor (
-        IFloorAuthority _authority,
+        address _authority,
         address _inventoryStaking,
         address _liquidityStaking,
         address _treasury
-    ) FloorAccessControlled(_authority) {
+    ) FloorAccessControlled(IFloorAuthority(_authority)) {
         inventoryStaking = INFTXInventoryStaking(_inventoryStaking);
         liquidityStaking = INFTXLPStaking(_liquidityStaking);
 
