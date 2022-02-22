@@ -24,7 +24,7 @@ const STATUS_RISKRESERVETOKEN = 8;
  * Validates new Treasury functionality made for the FLOOR fork.
  */
 
-describe("FLOOR Treasury - tokenValue Tests", function () {
+describe("FLOOR Treasury", function () {
 
   // Our deployed treasury contract
   let floor;
@@ -96,7 +96,7 @@ describe("FLOOR Treasury - tokenValue Tests", function () {
     const address_y = USDC_ADDRESS;
 
     // Confirm that we can't set our RiskOff valuation without permissions applied
-    expect(treasury.setRiskOffValuation(address_x, 2)).to.be.revertedWith("Risk on permission not given");
+    await expect(treasury.setRiskOffValuation(address_x, 2)).to.be.revertedWith("Risk on permission not given");
 
     // Set up our permissions, allowing the deployer to set risk valuation
     // await treasury.initialize()
@@ -117,7 +117,7 @@ describe("FLOOR Treasury - tokenValue Tests", function () {
     // Remove our user's permissions from managing and confirm that we can no longer
     // set the RiskOff valuation
     await treasury.disable(STATUS_RISKRESERVETOKEN, address_x)
-    expect(treasury.setRiskOffValuation(address_x, 2)).to.be.revertedWith("Risk on permission not given");
+    await expect(treasury.setRiskOffValuation(address_x, 2)).to.be.revertedWith("Risk on permission not given");
   });
 
 
@@ -169,6 +169,93 @@ describe("FLOOR Treasury - tokenValue Tests", function () {
 
     // We now have PUNK_WETH treated as a liquidity token with a RiskOffValuation to boot
     expect(await treasury.tokenValue(PUNK_WETH_ADDRESS, "10000000000000000000")).to.equal("5000000000000000000000000000");
+  });
+
+  /**
+   * We should be able to receive ERC721 tokens into the Treasury and then have
+   * an `onlyGovenor` user able to withdraw them.
+   */
+
+  it("Should allow ERC721 tokens to be deposited and withdrawn", async function () {
+    // Deploy our mock ERC721 to test with
+    const ERC721MockContract = await ethers.getContractFactory("ERC721Mock");
+    erc721 = await ERC721MockContract.deploy("Test NFT", "tNFT");
+
+    // Mint 3 tokens across 2 users
+    await erc721.mint(users[0].address, 0)
+    await erc721.mint(users[0].address, 1)
+    await erc721.mint(users[1].address, 2)
+
+    // Confirm our balances
+    expect(await erc721.balanceOf(users[0].address)).to.equal(2)
+    expect(await erc721.balanceOf(users[1].address)).to.equal(1)
+    expect(await erc721.balanceOf(deployer.address)).to.equal(0)
+    expect(await erc721.balanceOf(treasury.address)).to.equal(0)
+
+    // Not approved to deposit
+    await expect(treasury.connect(users[0]).depositERC721(erc721.address, 2)).to.be.revertedWith('Treasury: not approved')
+
+    // Add our users to be RESERVEDEPOSITOR so they can deposit ERC721s
+    await treasury.enable(0, users[0].address, ethers.constants.AddressZero);  // RESERVEDEPOSITOR
+    await treasury.enable(0, users[1].address, ethers.constants.AddressZero);  // RESERVEDEPOSITOR
+
+    // Depositting ERC721 that they don't own
+    await expect(treasury.connect(users[0]).depositERC721(erc721.address, 2)).to.be.revertedWith('WRONG_FROM')
+
+    // Depositting ERC721 that has not been minted
+    await expect(treasury.connect(users[0]).depositERC721(erc721.address, 3)).to.be.revertedWith('WRONG_FROM')
+
+    // Depositting ERC721 that has not been approved
+    await expect(treasury.connect(users[0]).depositERC721(erc721.address, 0)).to.be.revertedWith('NOT_AUTHORIZED')
+
+    // Confirm that ERC721 can be deposited when approved
+    await erc721.connect(users[0]).approve(treasury.address, 0)
+    await treasury.connect(users[0]).depositERC721(erc721.address, 0)
+
+    await erc721.connect(users[1]).approve(treasury.address, 2)
+    await treasury.connect(users[1]).depositERC721(erc721.address, 2)
+
+    // Confirm our updated expected balances
+    expect(await erc721.balanceOf(users[0].address)).to.equal(1)
+    expect(await erc721.balanceOf(users[1].address)).to.equal(0)
+    expect(await erc721.balanceOf(deployer.address)).to.equal(0)
+    expect(await erc721.balanceOf(treasury.address)).to.equal(2)
+
+    // Confirm that a non-deployer user cannot withdraw and ERC721
+    await expect(treasury.connect(users[0]).withdrawERC721(erc721.address, 0)).to.be.reverted
+
+    // Withdrawing an ERC721 not in treasury
+    await expect(treasury.withdrawERC721(erc721.address, 1)).to.be.revertedWith('NOT_AUTHORIZED')
+
+    // Withdrawing an ERC721 with a NULL address
+    await expect(treasury.withdrawERC721(ethers.constants.AddressZero, 0)).to.be.revertedWith('function call to a non-contract account')
+
+    // Confirm that ERC721 can be withdrawn
+    await treasury.withdrawERC721(erc721.address, 0)
+
+    // Confirm our updated expected balances
+    expect(await erc721.balanceOf(users[0].address)).to.equal(1)
+    expect(await erc721.balanceOf(users[1].address)).to.equal(0)
+    expect(await erc721.balanceOf(deployer.address)).to.equal(1)
+    expect(await erc721.balanceOf(treasury.address)).to.equal(1)
+
+    // Send ERC721 outside of defined functions
+    await erc721.connect(users[0]).transferFrom(users[0].address, treasury.address, 1)
+
+    // Confirm our updated expected balances
+    expect(await erc721.balanceOf(users[0].address)).to.equal(0)
+    expect(await erc721.balanceOf(users[1].address)).to.equal(0)
+    expect(await erc721.balanceOf(deployer.address)).to.equal(1)
+    expect(await erc721.balanceOf(treasury.address)).to.equal(2)
+
+    // Confirm that ERC721 can be withdrawn
+    await treasury.withdrawERC721(erc721.address, 1)
+
+    // Confirm our updated expected balances
+    expect(await erc721.balanceOf(users[0].address)).to.equal(0)
+    expect(await erc721.balanceOf(users[1].address)).to.equal(0)
+    expect(await erc721.balanceOf(deployer.address)).to.equal(2)
+    expect(await erc721.balanceOf(treasury.address)).to.equal(1)
   });
 
 });
