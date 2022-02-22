@@ -192,13 +192,6 @@ describe("FLOOR Treasury", function () {
     expect(await erc721.balanceOf(deployer.address)).to.equal(0)
     expect(await erc721.balanceOf(treasury.address)).to.equal(0)
 
-    // Not approved to deposit
-    await expect(treasury.connect(users[0]).depositERC721(erc721.address, 2)).to.be.revertedWith('Treasury: not approved')
-
-    // Add our users to be RESERVEDEPOSITOR so they can deposit ERC721s
-    await treasury.enable(0, users[0].address, ethers.constants.AddressZero);  // RESERVEDEPOSITOR
-    await treasury.enable(0, users[1].address, ethers.constants.AddressZero);  // RESERVEDEPOSITOR
-
     // Depositting ERC721 that they don't own
     await expect(treasury.connect(users[0]).depositERC721(erc721.address, 2)).to.be.revertedWith('WRONG_FROM')
 
