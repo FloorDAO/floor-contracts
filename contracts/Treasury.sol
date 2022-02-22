@@ -7,6 +7,7 @@ import "./libraries/SafeERC20.sol";
 import "./interfaces/IOwnable.sol";
 import "./interfaces/IERC20.sol";
 import "./interfaces/IERC20Metadata.sol";
+import "./interfaces/IERC721.sol";
 import "./interfaces/IFLOOR.sol";
 import "./interfaces/IsFLOOR.sol";
 import "./interfaces/IBondingCalculator.sol";
@@ -25,6 +26,8 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
 
     event Deposit(address indexed token, uint256 amount, uint256 value);
     event Withdrawal(address indexed token, uint256 amount, uint256 value);
+    event DepositERC721(address indexed token, uint256 tokenId);
+    event WithdrawERC721(address indexed token, uint256 tokenId);
     event CreateDebt(address indexed debtor, address indexed token, uint256 amount, uint256 value);
     event RepayDebt(address indexed debtor, address indexed token, uint256 amount, uint256 value);
     event Managed(address indexed token, uint256 amount);
@@ -178,6 +181,29 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
         }
         IERC20(_token).safeTransfer(msg.sender, _amount);
         emit Managed(_token, _amount);
+    }
+
+    /**
+     * @notice allow approved address to deposit an ERC721
+     * @param _token address
+     * @param _tokenId uint256
+     */
+    function depositERC721(address _token, uint256 _tokenId) external override {
+        IERC721(_token).safeTransferFrom(msg.sender, address(this), _tokenId);
+        emit DepositERC721(_token, _tokenId);
+    }
+
+    /**
+     * @notice allow approved address to withdraw ERC721
+     * @param _token address
+     * @param _tokenId uint256
+     */
+    function withdrawERC721(address _token, uint256 _tokenId) external override onlyGovernor {
+        IERC721 erc721 = IERC721(_token);
+        erc721.approve(msg.sender, _tokenId);
+        erc721.safeTransferFrom(address(this), msg.sender, _tokenId);
+
+        emit WithdrawERC721(_token, _tokenId);
     }
 
     /**
@@ -601,5 +627,17 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
      */
     function baseSupply() external view override returns (uint256) {
         return FLOOR.totalSupply() - floorDebt;
+    }
+
+    /**
+     * @notice handles safeTransferFrom of 721s to the treasury
+     */
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) external returns (bytes4) {
+      return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
     }
 }
