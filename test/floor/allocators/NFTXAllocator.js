@@ -117,13 +117,11 @@ describe("NFTX Allocator Logic", function () {
 
     expect(valid_token_mapping.underlying).to.equal(TEST_ADDRESS_1);
     expect(valid_token_mapping.xToken).to.equal(TEST_ADDRESS_2);
-    expect(valid_token_mapping.deployed).to.equal(0);
 
     invalid_token_mapping = await allocator.dividendTokenInfo(TEST_ADDRESS_2);
 
     expect(invalid_token_mapping.underlying).to.equal(NULL_ADDRESS);
     expect(invalid_token_mapping.xToken).to.equal(NULL_ADDRESS);
-    expect(invalid_token_mapping.deployed).to.equal(0);
   });
 
 
@@ -140,7 +138,6 @@ describe("NFTX Allocator Logic", function () {
 
     expect(invalid_token_mapping.underlying).to.equal(NULL_ADDRESS);
     expect(invalid_token_mapping.xToken).to.equal(NULL_ADDRESS);
-    expect(invalid_token_mapping.deployed).to.equal(0);
   });
 
 
@@ -201,7 +198,7 @@ describe("NFTX Allocator Logic", function () {
   it("Should be able to harvest all rewards against a token", async function () {
     // Approve our reward token in the treasury
     await treasury.enable(2, rewardToken.address, bondingCalculator.address);  // RESERVETOKEN
-    await treasury.enable(0, allocator.address, bondingCalculator.address);    // RESERVEDEPOSITOR
+    await treasury.enable(13, allocator.address, bondingCalculator.address);   // ALLOCATOR
 
     // Set up an inventory and liquidity pool vaults
     await allocator.setStakingToken(TEST_ADDRESS_1, rewardToken.address, 123, false);  // Inventory
@@ -238,7 +235,6 @@ describe("NFTX Allocator Logic", function () {
     unknown_token_mapping = await allocator.dividendTokenInfo(punk.address);
     expect(unknown_token_mapping.underlying).to.equal(NULL_ADDRESS);
     expect(unknown_token_mapping.xToken).to.equal(NULL_ADDRESS);
-    expect(unknown_token_mapping.deployed).to.equal(0);
 
     // Send a known ERC20 to the contract
     await punketh_alt.mint(allocator.address, 100);
@@ -255,7 +251,6 @@ describe("NFTX Allocator Logic", function () {
     unknown_token_mapping = await allocator.dividendTokenInfo(punk.address);
     expect(unknown_token_mapping.underlying).to.equal(NULL_ADDRESS);
     expect(unknown_token_mapping.xToken).to.equal(NULL_ADDRESS);
-    expect(unknown_token_mapping.deployed).to.equal(0);
 
     // Confirm that the Govenor does not currently hold any of the unknown token
     expect(await punk.balanceOf(deployer.address)).to.equal(0);
@@ -367,7 +362,6 @@ describe("NFTX Allocator Logic", function () {
     let dividendTokenInfo = await allocator.dividendTokenInfo(punk.address);
     expect(dividendTokenInfo.underlying).to.equal(punk.address);
     expect(dividendTokenInfo.xToken).to.equal(xPunkToken.address);
-    expect(dividendTokenInfo.deployed).to.equal(1_000);
 
     // Send to liquidity
     await allocator.deposit(punketh.address, 5_000);
@@ -396,7 +390,6 @@ describe("NFTX Allocator Logic", function () {
     dividendTokenInfo = await allocator.dividendTokenInfo(punketh.address);
     expect(dividendTokenInfo.underlying).to.equal(punketh.address);
     expect(dividendTokenInfo.xToken).to.equal(xPunkEthToken.address);
-    expect(dividendTokenInfo.deployed).to.equal(5_000);
 
     // Now that we have funds in the treasury and allocator, we can
     // test our withdrawal logic.
@@ -421,7 +414,6 @@ describe("NFTX Allocator Logic", function () {
     dividendTokenInfo = await allocator.dividendTokenInfo(punk.address);
     expect(dividendTokenInfo.underlying).to.equal(punk.address);
     expect(dividendTokenInfo.xToken).to.equal(xPunkToken.address);
-    expect(dividendTokenInfo.deployed).to.equal(0);
 
     // Withdrawl from liquidity
     await allocator.withdraw(punketh.address, 5_000);
@@ -439,7 +431,6 @@ describe("NFTX Allocator Logic", function () {
     dividendTokenInfo = await allocator.dividendTokenInfo(punketh.address);
     expect(dividendTokenInfo.underlying).to.equal(punketh.address);
     expect(dividendTokenInfo.xToken).to.equal(xPunkEthToken.address);
-    expect(dividendTokenInfo.deployed).to.equal(0);
   });
 
 

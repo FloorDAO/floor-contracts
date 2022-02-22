@@ -7,10 +7,12 @@ import "../libraries/SafeERC20.sol";
 import "../interfaces/IOwnable.sol";
 import "../interfaces/IERC20.sol";
 import "../interfaces/IERC20Metadata.sol";
+import "../interfaces/IERC721.sol";
 import "../interfaces/IFLOOR.sol";
 import "../interfaces/IsFLOOR.sol";
 import "../interfaces/IBondingCalculator.sol";
 import "../interfaces/ITreasury.sol";
+import "../interfaces/INFTXLPStaking.sol";
 
 import "../types/FloorAccessControlled.sol";
 
@@ -24,6 +26,8 @@ contract TreasuryMock is FloorAccessControlled, ITreasury {
 
     event Deposit(address indexed token, uint256 amount, uint256 value);
     event Withdrawal(address indexed token, uint256 amount, uint256 value);
+    event DepositERC721(address indexed token, uint256 tokenId);
+    event WithdrawERC721(address indexed token, uint256 tokenId);
     event AllocatorDeposit(address indexed token, uint256 amount, uint256 value);
     event AllocatorWithdrawal(address indexed token, uint256 amount, uint256 value);
     event CreateDebt(address indexed debtor, address indexed token, uint256 amount, uint256 value);
@@ -85,6 +89,8 @@ contract TreasuryMock is FloorAccessControlled, ITreasury {
 
     bool public timelockEnabled;
     bool public initialized;
+
+    bytes4 constant ERC721_RECEIVED = 0xf0b9e5ba;
 
     uint256 public onChainGovernanceTimelock;
 
@@ -187,6 +193,29 @@ contract TreasuryMock is FloorAccessControlled, ITreasury {
     }
 
     /**
+     * @notice allow approved address to deposit an ERC721
+     * @param _token address
+     * @param _tokenId uint256
+     */
+    function depositERC721(address _token, uint256 _tokenId) external override {
+        IERC721(_token).transferFrom(msg.sender, address(this), _tokenId);
+        emit DepositERC721(_token, _tokenId);
+    }
+
+    /**
+     * @notice allow approved address to withdraw ERC721
+     * @param _token address
+     * @param _tokenId uint256
+     */
+    function withdrawERC721(address _token, uint256 _tokenId) external override onlyGovernor {
+        IERC721 erc721 = IERC721(_token);
+        erc721.approve(msg.sender, _tokenId);
+        erc721.transferFrom(address(this), msg.sender, _tokenId);
+
+        emit WithdrawERC721(_token, _tokenId);
+    }
+
+    /**
      * @notice allocators can manage assets without being limited by excessReserves
      * @notice always ensure the reserves are repalaced in the same transaction
      * @param _token address
@@ -201,6 +230,40 @@ contract TreasuryMock is FloorAccessControlled, ITreasury {
         }
         IERC20(_token).safeTransfer(msg.sender, _amount);
         emit AllocatorManaged(_token, _amount);
+    }
+
+    /**
+     * @notice Claim rewards from a Liquidity Staking vault on NFTX
+     * @param _liquidityStaking address
+     * @param _vaultId uint256
+     * @param _rewardToken address
+     */
+    function claimNFTXRewards(address _liquidityStaking, uint256 _vaultId, address _rewardToken) external override {
+        require(permissions[STATUS.ALLOCATOR][msg.sender], notApproved);
+        require(permissions[STATUS.RESERVETOKEN][_rewardToken], notAccepted);
+
+        // Get the reward token held in the treasury before our claim
+        uint256 previousBalance = IERC20(_rewardToken).balanceOf(address(this));
+
+        // Claim rewards from the NFTX vault
+        INFTXLPStaking(_liquidityStaking).claimRewards(_vaultId);
+
+        // Get our updated balance after claiming rewards
+        uint256 newBalance = IERC20(_rewardToken).balanceOf(address(this));
+
+        // If our balance has not changed, we don't need to process further
+        if (newBalance <= previousBalance) {
+            return;
+        }
+
+        uint256 balanceDifference = previousBalance - newBalance;
+
+        // Update our total reserves based on the updated balance
+        totalReserves = totalReserves.add(balanceDifference);
+
+        // Emit our Deposit event
+        uint256 value = tokenValue(_rewardToken, balanceDifference);
+        emit Deposit(_rewardToken, balanceDifference, value);
     }
 
     /**
@@ -542,4 +605,5 @@ contract TreasuryMock is FloorAccessControlled, ITreasury {
     function baseSupply() external view override returns (uint256) {
         return FLOOR.totalSupply() - floorDebt;
     }
+
 }
