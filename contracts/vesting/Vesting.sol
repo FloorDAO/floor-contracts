@@ -22,7 +22,7 @@ import "../interfaces/IStaking.sol";
  *  sellers, since the tokens sold are still considered staked within this contract. This  
  *  step was taken to ensure fair distribution of exposure in the network.  
  */
-contract VestingClaim is Ownable, FloorAccessControlled {
+contract VestingClaim is FloorAccessControlled {
 
     /* ========== DEPENDENCIES ========== */
 
@@ -206,7 +206,7 @@ contract VestingClaim is Ownable, FloorAccessControlled {
         uint256 _percent, 
         uint256 _gClaimed, 
         uint256 _max
-    ) public onlyOwner {
+    ) public onlyGovernor {
         require(terms[_address].max == 0, "address already exists");
         terms[_address] = Term({
             percent: _percent,

@@ -117,7 +117,8 @@ async function main() {
   const aFLOOR = await AFLOOR.deploy(deployer.address);
 
   const AFLOORMigration = await ethers.getContractFactory("AlphaFloorMigration");
-  const aFloorMigration = await AFLOORMigration.deploy();
+  const aFloorMigration = await AFLOORMigration.deploy(authority.address);
+  aFloorMigration.initialize(floor.address, aFLOOR.address, 200000);
 
   const PFLOOR = await ethers.getContractFactory("VestingClaim");
   const pFLOOR = await PFLOOR.deploy(floor.address, weeth, gFLOOR.address, floorTreasury.address, staking.address, authority.address);
@@ -146,6 +147,11 @@ async function main() {
   console.log("NFTXXTokenWethCalculator:", nftxXTokenWethCalculator.address);
 
   console.log("Drip:", drip.address);
+
+  // Transfer authority to DAO
+  authority.pushGovernor("0x6ce798Bc8C8C93F3C312644DcbdD2ad6698622C5", true);
+  authority.pushGuardian("0x6ce798Bc8C8C93F3C312644DcbdD2ad6698622C5", true);
+  authority.pushPolicy("0x6ce798Bc8C8C93F3C312644DcbdD2ad6698622C5", true);
 
   console.log('Deployment complete');
 

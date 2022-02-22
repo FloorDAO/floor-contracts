@@ -4,9 +4,9 @@ pragma solidity 0.7.5;
 
 import "./interfaces/IERC20.sol";
 import "./libraries/SafeMath.sol";
-import "./types/Ownable.sol";
+import "./types/FloorAccessControlled.sol";
 
-contract AlphaFloorMigration is Ownable {
+contract AlphaFloorMigration is FloorAccessControlled {
     using SafeMath for uint256;
 
     uint256 public swapEndBlock;
@@ -26,13 +26,15 @@ contract AlphaFloorMigration is Ownable {
         _;
     }
 
-    constructor() {}
+    constructor(
+        address _authority
+    ) FloorAccessControlled(IFloorAuthority(_authority)) {}
 
     function initialize (
         address _FLOOR,
         address _aFLOOR,
         uint256 _swapDuration
-    ) public notInitialized() onlyOwner() {
+    ) public notInitialized() onlyGovernor {
         require(_swapDuration < 2_000_000, "swap duration too long");
         FLOOR = IERC20(_FLOOR);
         aFLOOR = IERC20(_aFLOOR);
@@ -58,7 +60,7 @@ contract AlphaFloorMigration is Ownable {
     /**
       * @notice governor can withdraw any remaining FLOOR after swapEndBlock
       */
-    function withdraw() external onlyOwner() {
+    function withdraw() external onlyGovernor {
         require(block.number > swapEndBlock, "swapping of aFLOOR is ongoing");
         uint256 amount = FLOOR.balanceOf(address(this));
         FLOOR.transfer(msg.sender, amount);
