@@ -88,8 +88,6 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
     bool public timelockEnabled;
     bool public initialized;
 
-    bytes4 constant ERC721_RECEIVED = 0xf0b9e5ba;
-
     uint256 public onChainGovernanceTimelock;
 
     string internal notAccepted = "Treasury: not accepted";
@@ -191,7 +189,7 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
      * @param _tokenId uint256
      */
     function depositERC721(address _token, uint256 _tokenId) external override {
-        IERC721(_token).transferFrom(msg.sender, address(this), _tokenId);
+        IERC721(_token).safeTransferFrom(msg.sender, address(this), _tokenId);
         emit DepositERC721(_token, _tokenId);
     }
 
@@ -203,7 +201,7 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
     function withdrawERC721(address _token, uint256 _tokenId) external override onlyGovernor {
         IERC721 erc721 = IERC721(_token);
         erc721.approve(msg.sender, _tokenId);
-        erc721.transferFrom(address(this), msg.sender, _tokenId);
+        erc721.safeTransferFrom(address(this), msg.sender, _tokenId);
 
         emit WithdrawERC721(_token, _tokenId);
     }
@@ -631,4 +629,15 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
         return FLOOR.totalSupply() - floorDebt;
     }
 
+    /**
+     * @notice handles safeTransferFrom of 721s to the treasury
+     */
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) external returns (bytes4) {
+      return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
+    }
 }
