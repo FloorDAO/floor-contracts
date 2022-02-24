@@ -29,7 +29,7 @@ contract TokenWethCalculator is IBondingCalculator {
     }
 
     function valuation(address _pair, uint256 amount_) external view override returns (uint256 _value) {
-        IUniswapV2Pair memory uniswapPair = IUniswapV2Pair(_pair);
+        IUniswapV2Pair uniswapPair = IUniswapV2Pair(_pair);
 
         (uint256 reserve0, uint256 reserve1, ) = uniswapPair.getReserves();
 

@@ -91,17 +91,6 @@ contract VestingClaim is FloorAccessControlled {
     }
 
     /**
-     * @notice allows wallet to claim FLOOR and stake. set _claim = true if warmup is 0.
-     * @param _to address
-     * @param _amount uint256
-     * @param _rebasing bool
-     * @param _claimFromStaking bool
-     */
-    function stake(address _to, uint256 _amount, bool _rebasing, bool _claimFromStaking) external {
-        staking.stake(_to, _claim(_amount), _rebasing, _claimFromStaking);
-    }
-
-    /**
      * @notice logic for claiming FLOOR
      * @param _amount uint256 The amount being claimed in WETH (18 decimals)
      * @return toSend_ uint256

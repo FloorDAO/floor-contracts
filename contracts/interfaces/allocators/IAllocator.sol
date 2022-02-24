@@ -17,5 +17,6 @@ interface IAllocator {
     // NFTX Vault mapping utility
     function setStakingToken(address _token, address _rewardToken, uint256 vaultId, bool _isLiquidityPool) external;
     function removeStakingToken(address _token) external;
-    function addDividendToken(address _token, address _xToken) external;
+    function setDividendToken(address _token, address _xToken) external;
+    function removeDividendToken(address _token) external;
 }

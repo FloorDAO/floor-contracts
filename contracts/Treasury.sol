@@ -49,12 +49,12 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
         LIQUIDITYTOKEN,
         LIQUIDITYMANAGER,
         RESERVEDEBTOR,
-        RISKRESERVETOKEN,
+        RISKRESERVETOKEN,  // Allows a RESERVETOKEN to use a custom riskOffValuation when calculating tokenValue
         REWARDMANAGER,
         SFLOOR,
         FLOORDEBTOR,
-        XTOKEN, // Any token that requires a calculator to determine its value
-        ALLOCATOR
+        XTOKEN,  // Any RESERVETOKEN that requires a calculator to determine its value
+        ALLOCATOR  // Grants permission to withdraw Treasury reserves
     }
 
     struct Queue {
@@ -248,7 +248,7 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
             return;
         }
 
-        uint256 balanceDifference = previousBalance - newBalance;
+        uint256 balanceDifference = newBalance.sub(previousBalance);
 
         // Emit our Deposit event
         uint256 value = tokenValue(_rewardToken, balanceDifference);

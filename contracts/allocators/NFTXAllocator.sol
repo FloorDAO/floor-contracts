@@ -35,16 +35,6 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
         bool exists;
     }
 
-    /**
-     * @notice describes the dividend token minted from staking token.
-     */
-
-    struct dividendTokenData {
-        address underlying; // stakingToken
-        address xToken; // dividendToken
-        bool exists;
-    }
-
     event TreasuryAssetDeployed(address token, uint256 amount, uint256 value);
     event TreasuryAssetReturned(address token, uint256 amount, uint256 value);
 
@@ -61,7 +51,7 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
     mapping (address => stakingTokenData) public stakingTokenInfo;
 
     // Corresponding xTokens for tokens
-    mapping (address => dividendTokenData) public dividendTokenInfo;
+    mapping (address => address) public dividendTokenMapping;
 
 
     /**
@@ -135,13 +125,13 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
 
     function deposit(address _token, uint256 _amount) external override onlyGovernor {
         stakingTokenData memory stakingToken = stakingTokenInfo[_token];
-        dividendTokenData memory dividendToken = dividendTokenInfo[_token];
+        address dividendToken = dividendTokenMapping[_token];
 
         require(stakingToken.exists, "Unsupported staking token");
-        require(dividendToken.underlying == _token, "Unsupported dividend token");
+        require(dividendToken != address(0), "Unsupported dividend token");
 
-        // Ensure that a calculator exists for the `dividendTokenInfo[_token].xToken`
-        require(treasury.bondCalculator(dividendToken.xToken) != address(0), "Unsupported xToken calculator");
+        // Ensure that a calculator exists for the `dividendToken`
+        require(treasury.bondCalculator(dividendToken) != address(0), "Unsupported xToken calculator");
 
         // Retrieve amount of asset from treasury, decreasing total reserves
         treasury.allocatorManage(_token, _amount);
@@ -165,23 +155,23 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
 
     function withdraw(address _token, uint256 _amount) external override onlyGovernor {
         stakingTokenData memory stakingToken = stakingTokenInfo[_token];
-        dividendTokenData memory dividendToken = dividendTokenInfo[_token];
+        address dividendToken = dividendTokenMapping[_token];
 
         require(stakingToken.exists, "Unsupported staking token");
-        require(dividendToken.underlying == _token, "Unsupported dividend token");
+        require(dividendToken != address(0), "Unsupported dividend token");
 
         // Retrieve amount of asset from treasury, decreasing total reserves
-        treasury.allocatorManage(dividendToken.xToken, _amount);
+        treasury.allocatorManage(dividendToken, _amount);
 
-        uint256 valueWithdrawn = treasury.tokenValue(dividendToken.xToken, _amount);
-        emit TreasuryAssetDeployed(dividendToken.xToken, _amount, valueWithdrawn);
+        uint256 valueWithdrawn = treasury.tokenValue(dividendToken, _amount);
+        emit TreasuryAssetDeployed(dividendToken, _amount, valueWithdrawn);
 
         // Approve and withdraw from staking pool, returning asset and potentially reward tokens
         if (stakingToken.isLiquidityPool) {
-            IERC20(dividendToken.xToken).safeApprove(address(liquidityStaking), _amount);
+            IERC20(dividendToken).safeApprove(address(liquidityStaking), _amount);
             liquidityStaking.withdraw(stakingToken.vaultId, _amount);
         } else {
-            IERC20(dividendToken.xToken).safeApprove(address(inventoryStaking), _amount);
+            IERC20(dividendToken).safeApprove(address(inventoryStaking), _amount);
             inventoryStaking.withdraw(stakingToken.vaultId, _amount); 
         }
 
@@ -204,36 +194,31 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
 
     function depositXTokenToTreasury(address _token) external onlyGovernor {
         stakingTokenData memory stakingToken = stakingTokenInfo[_token];
-        dividendTokenData memory dividendToken = dividendTokenInfo[_token];
+        address dividendToken = dividendTokenMapping[_token];
 
         require(stakingToken.exists, "Unsupported staking token");
-        require(dividendToken.underlying == _token, "Unsupported dividend token");
+        require(dividendToken != address(0), "Unsupported dividend token");
 
         // Get the balance of the xToken
-        uint256 balance = IERC20(dividendToken.xToken).balanceOf(address(this));
-        uint256 value = treasury.tokenValue(dividendToken.xToken, balance);
+        uint256 balance = IERC20(dividendToken).balanceOf(address(this));
+        uint256 value = treasury.tokenValue(dividendToken, balance);
 
         // Deposit the xToken back into the treasury, increasing total reserves and minting 0 FLOOR
-        IERC20(dividendToken.xToken).safeApprove(address(treasury), balance);
-        treasury.deposit(balance, dividendToken.xToken, value);
+        IERC20(dividendToken).safeApprove(address(treasury), balance);
+        treasury.deposit(balance, dividendToken, value);
 
-        emit TreasuryAssetReturned(dividendToken.xToken, balance, value);
+        emit TreasuryAssetReturned(dividendToken, balance, value);
     }
 
     /**
      * @notice adds asset and corresponding xToken to mapping
      */
 
-    function addDividendToken(address _token, address _xToken) external override onlyGovernor {
+    function setDividendToken(address _token, address _xToken) external override onlyGovernor {
         require(_token != address(0), "Token: Zero address");
         require(_xToken != address(0), "xToken: Zero address");
-        require(!dividendTokenInfo[_token].exists, "Token already added");
 
-        dividendTokenInfo[_token] = dividendTokenData({
-            underlying: _token,
-            xToken: _xToken,
-            exists: true
-        });
+        dividendTokenMapping[_token] = _xToken;
     }
 
 
@@ -242,7 +227,7 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
      */
 
     function removeDividendToken(address _token) external override onlyGovernor {
-        delete dividendTokenInfo[_token];
+        delete dividendTokenMapping[_token];
     }
 
 
@@ -252,7 +237,6 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
 
     function setStakingToken(address _token, address _rewardToken, uint256 _vaultId, bool _isLiquidityPool) external override onlyGovernor {
         require(_token != address(0), "Cannot set vault for NULL token");
-        require(!stakingTokenInfo[_token].exists, "Token already added");
 
         // Set up our vault mapping information
         stakingTokenInfo[_token] = stakingTokenData({
