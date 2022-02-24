@@ -103,6 +103,7 @@ contract VestingClaim is FloorAccessControlled {
 
         // Sense check the amount requested
         require(_amount > 0, "Nothing to claim");
+        require(redeemableForValue.mul(1e6) >= _amount, "Claim more than vested");
 
         // Transfer WETH from sender to treasury
         WETH.safeTransferFrom(msg.sender, address(this), _amount);
