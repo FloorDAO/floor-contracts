@@ -120,6 +120,30 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
 
 
     /**
+     * @notice There should be no rewards held in the allocator, but any dust has formed
+     * then we can use this check to claim rewards to the allocator and transfer it
+     * to the governor.
+     * 
+     * @param _token address Address of the staking token
+     */
+
+    function rescueRewards(address _token) external onlyGovernor {
+        stakingTokenData memory stakingToken = stakingTokenInfo[_token];
+
+        // We only want to allow harvesting from a specified liquidity pool mapping
+        require(stakingToken.exists, "Unsupported token");
+        require(stakingToken.isLiquidityPool, "Must be liquidity staking token");
+
+        INFTXLPStaking(address(liquidityStaking)).claimRewards(stakingToken.vaultId);
+
+        uint256 rewardTokenBalance = IERC20(stakingToken.rewardToken).balanceOf(address(this));
+        if (rewardTokenBalance > 0) {
+            IERC20(stakingToken.rewardToken).safeTransfer(msg.sender, rewardTokenBalance);
+        }
+    }
+
+
+    /**
      * @notice withdraws asset from treasury, deposits asset into NFTX staking.
      */
 
