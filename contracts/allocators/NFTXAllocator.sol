@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.7.5;
 
-import "../libraries/Address.sol";
 import "../libraries/SafeMath.sol";
 import "../libraries/SafeERC20.sol";
 
@@ -49,15 +48,14 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
     event TreasuryAssetDeployed(address token, uint256 amount, uint256 value);
     event TreasuryAssetReturned(address token, uint256 amount, uint256 value);
 
-
     // NFTX Inventory Staking contract
-    INFTXInventoryStaking internal inventoryStaking;
+    INFTXInventoryStaking internal immutable inventoryStaking;
 
     // NFTX Liquidity Staking contract
-    INFTXLPStaking internal liquidityStaking;
+    INFTXLPStaking internal immutable liquidityStaking;
 
     // Floor Treasury contract
-    ITreasury internal treasury;
+    ITreasury internal immutable treasury;
 
     // Corresponding NFTX token vault data for tokens
     mapping (address => stakingTokenData) public stakingTokenInfo;
@@ -96,16 +94,18 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
      * @notice claims rewards from the vault.
      */
 
-    function harvestAll(address _token) override external onlyPolicy {
+    function harvestAll(address _token) external override onlyGovernor {
+        stakingTokenData memory stakingToken = stakingTokenInfo[_token];
+
         // We only want to allow harvesting from a specified liquidity pool mapping
-        require(stakingTokenInfo[_token].exists, "Unsupported token");
-        require(stakingTokenInfo[_token].isLiquidityPool, "Must be liquidity staking token");
+        require(stakingToken.exists, "Unsupported token");
+        require(stakingToken.isLiquidityPool, "Must be liquidity staking token");
 
         // Send a request to the treasury to claim rewards from the NFTX liquidity staking pool
         treasury.claimNFTXRewards(
             address(liquidityStaking),
-            stakingTokenInfo[_token].vaultId,
-            stakingTokenInfo[_token].rewardToken
+            stakingToken.vaultId,
+            stakingToken.rewardToken
         );
     }
 
@@ -133,12 +133,15 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
      * @notice withdraws asset from treasury, deposits asset into NFTX staking.
      */
 
-    function deposit(address _token, uint256 _amount) external override onlyPolicy {
-        require(stakingTokenInfo[_token].exists, "Unsupported staking token");
-        require(dividendTokenInfo[_token].underlying == _token, "Unsupported dividend token");
+    function deposit(address _token, uint256 _amount) external override onlyGovernor {
+        stakingTokenData memory stakingToken = stakingTokenInfo[_token];
+        dividendTokenData memory dividendToken = dividendTokenInfo[_token];
+
+        require(stakingToken.exists, "Unsupported staking token");
+        require(dividendToken.underlying == _token, "Unsupported dividend token");
 
         // Ensure that a calculator exists for the `dividendTokenInfo[_token].xToken`
-        require(treasury.bondCalculator(dividendTokenInfo[_token].xToken) != address(0), "Unsupported xToken calculator");
+        require(treasury.bondCalculator(dividendToken.xToken) != address(0), "Unsupported xToken calculator");
 
         // Retrieve amount of asset from treasury, decreasing total reserves
         treasury.allocatorManage(_token, _amount);
@@ -147,12 +150,12 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
         emit TreasuryAssetDeployed(_token, _amount, value);
 
         // Approve and deposit into inventory pool, returning xToken
-        if (stakingTokenInfo[_token].isLiquidityPool) {
-            IERC20(_token).approve(address(liquidityStaking), _amount);
-            liquidityStaking.deposit(stakingTokenInfo[_token].vaultId, _amount);
+        if (stakingToken.isLiquidityPool) {
+            IERC20(_token).safeApprove(address(liquidityStaking), _amount);
+            liquidityStaking.deposit(stakingToken.vaultId, _amount);
         } else {
-            IERC20(_token).approve(address(inventoryStaking), _amount);
-            inventoryStaking.deposit(stakingTokenInfo[_token].vaultId, _amount);
+            IERC20(_token).safeApprove(address(inventoryStaking), _amount);
+            inventoryStaking.deposit(stakingToken.vaultId, _amount);
         }
     }
 
@@ -160,23 +163,26 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
      * @notice Withdraws from staking pool, and deposits asset into treasury.
      */
 
-    function withdraw(address _token, uint256 _amount) external override onlyPolicy {
-        require(stakingTokenInfo[_token].exists, "Unsupported staking token");
-        require(dividendTokenInfo[_token].underlying == _token, "Unsupported dividend token");
+    function withdraw(address _token, uint256 _amount) external override onlyGovernor {
+        stakingTokenData memory stakingToken = stakingTokenInfo[_token];
+        dividendTokenData memory dividendToken = dividendTokenInfo[_token];
+
+        require(stakingToken.exists, "Unsupported staking token");
+        require(dividendToken.underlying == _token, "Unsupported dividend token");
 
         // Retrieve amount of asset from treasury, decreasing total reserves
-        treasury.allocatorManage(dividendTokenInfo[_token].xToken, _amount);
+        treasury.allocatorManage(dividendToken.xToken, _amount);
 
-        uint256 valueWithdrawn = treasury.tokenValue(dividendTokenInfo[_token].xToken, _amount);
-        emit TreasuryAssetDeployed(dividendTokenInfo[_token].xToken, _amount, valueWithdrawn);
+        uint256 valueWithdrawn = treasury.tokenValue(dividendToken.xToken, _amount);
+        emit TreasuryAssetDeployed(dividendToken.xToken, _amount, valueWithdrawn);
 
         // Approve and withdraw from staking pool, returning asset and potentially reward tokens
-        if (stakingTokenInfo[_token].isLiquidityPool) {
-            IERC20(dividendTokenInfo[_token].xToken).approve(address(liquidityStaking), _amount);
-            liquidityStaking.withdraw(stakingTokenInfo[_token].vaultId, _amount);
+        if (stakingToken.isLiquidityPool) {
+            IERC20(dividendToken.xToken).safeApprove(address(liquidityStaking), _amount);
+            liquidityStaking.withdraw(stakingToken.vaultId, _amount);
         } else {
-            IERC20(dividendTokenInfo[_token].xToken).approve(address(inventoryStaking), _amount);
-            inventoryStaking.withdraw(stakingTokenInfo[_token].vaultId, _amount); 
+            IERC20(dividendToken.xToken).safeApprove(address(inventoryStaking), _amount);
+            inventoryStaking.withdraw(stakingToken.vaultId, _amount); 
         }
 
         // Get the balance of the returned vToken or vTokenWeth
@@ -184,7 +190,7 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
         uint256 value = treasury.tokenValue(_token, balance);
 
         // Deposit the token back into the treasury, increasing total reserves and minting 0 FLOOR
-        IERC20(_token).approve(address(treasury), balance);
+        IERC20(_token).safeApprove(address(treasury), balance);
         treasury.deposit(balance, _token, value);
 
         emit TreasuryAssetReturned(_token, balance, value);
@@ -196,26 +202,29 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
      * in the same transaction as `deposit()` because of a 2 second timelock in NFTX.
      */
 
-    function depositXTokenToTreasury(address _token) external onlyPolicy {
-        require(stakingTokenInfo[_token].exists, "Unsupported staking token");
-        require(dividendTokenInfo[_token].underlying == _token, "Unsupported dividend token");
+    function depositXTokenToTreasury(address _token) external onlyGovernor {
+        stakingTokenData memory stakingToken = stakingTokenInfo[_token];
+        dividendTokenData memory dividendToken = dividendTokenInfo[_token];
+
+        require(stakingToken.exists, "Unsupported staking token");
+        require(dividendToken.underlying == _token, "Unsupported dividend token");
 
         // Get the balance of the xToken
-        uint256 balance = IERC20(dividendTokenInfo[_token].xToken).balanceOf(address(this));
-        uint256 value = treasury.tokenValue(dividendTokenInfo[_token].xToken, balance);
+        uint256 balance = IERC20(dividendToken.xToken).balanceOf(address(this));
+        uint256 value = treasury.tokenValue(dividendToken.xToken, balance);
 
         // Deposit the xToken back into the treasury, increasing total reserves and minting 0 FLOOR
-        IERC20(dividendTokenInfo[_token].xToken).approve(address(treasury), balance);
-        treasury.deposit(balance, dividendTokenInfo[_token].xToken, value);
+        IERC20(dividendToken.xToken).safeApprove(address(treasury), balance);
+        treasury.deposit(balance, dividendToken.xToken, value);
 
-        emit TreasuryAssetReturned(dividendTokenInfo[_token].xToken, balance, value);
+        emit TreasuryAssetReturned(dividendToken.xToken, balance, value);
     }
 
     /**
      * @notice adds asset and corresponding xToken to mapping
      */
 
-    function addDividendToken(address _token, address _xToken) external override onlyPolicy {
+    function addDividendToken(address _token, address _xToken) external override onlyGovernor {
         require(_token != address(0), "Token: Zero address");
         require(_xToken != address(0), "xToken: Zero address");
         require(!dividendTokenInfo[_token].exists, "Token already added");
@@ -229,25 +238,37 @@ contract NFTXAllocator is IAllocator, FloorAccessControlled {
 
 
     /**
-     * @notice set vault mapping.
+     * @notice remove xToken mapping
      */
 
-    function setStakingToken(address _token, address _rewardToken, uint256 _vaultId, bool _isLiquidityPool) external override onlyPolicy {
-        require(_token != address(0), "Cannot set vault for NULL token");
-
-        // Set up our vault mapping information
-        stakingTokenInfo[_token].vaultId = _vaultId;
-        stakingTokenInfo[_token].isLiquidityPool = _isLiquidityPool;
-        stakingTokenInfo[_token].rewardToken = _rewardToken;
-        stakingTokenInfo[_token].exists = true;
+    function removeDividendToken(address _token) external override onlyGovernor {
+        delete dividendTokenInfo[_token];
     }
 
 
     /**
-     * @notice remove vault mapping.
+     * @notice set vault mapping
      */
 
-    function removeStakingToken(address _token) external override onlyPolicy {
+    function setStakingToken(address _token, address _rewardToken, uint256 _vaultId, bool _isLiquidityPool) external override onlyGovernor {
+        require(_token != address(0), "Cannot set vault for NULL token");
+        require(!stakingTokenInfo[_token].exists, "Token already added");
+
+        // Set up our vault mapping information
+        stakingTokenInfo[_token] = stakingTokenData({
+            vaultId: _vaultId,
+            isLiquidityPool: _isLiquidityPool,
+            rewardToken: _rewardToken,
+            exists: true
+        });
+    }
+
+
+    /**
+     * @notice remove vault mapping
+     */
+
+    function removeStakingToken(address _token) external override onlyGovernor {
         delete stakingTokenInfo[_token];
     }
 

@@ -74,7 +74,7 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
     mapping(STATUS => address[]) public registry;
     mapping(STATUS => mapping(address => bool)) public permissions;
     mapping(address => address) public override bondCalculator;
-    mapping(address => uint256) public _riskOffValuation; // 18 decimal in ETH terms 
+    mapping(address => uint256) public _riskOffValuation; // 9 decimal in FLOOR terms
 
     mapping(address => uint256) public debtLimit;
 
@@ -207,8 +207,9 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
     }
 
     /**
-     * @notice allocators can manage assets without being limited by excessReserves
-     * @notice always ensure the reserves are repalaced
+     * @notice allocators can manage assets without being limited by excessReserves. Reserves must
+     * be re-added to the treasury immediately after they are managed to avoid issues of invalid
+     * backing in the reserves.
      * @param _token address
      * @param _amount uint256
      */
@@ -582,8 +583,8 @@ contract FloorTreasury is FloorAccessControlled, ITreasury {
             return _amount.mul(riskOffValuation(_token)).div(10**IERC20Metadata(address(_token)).decimals());
         }
 
-        // If our token is an XTOKEN used in NFTX then we will utilise our bonding calculator
-        // to generate a valuation based on the underlying vToken amounts.
+        // If our token is an XTOKEN then we will utilise our bonding calculator to generate a
+        // valuation based on the underlying amounts.
         if (permissions[STATUS.XTOKEN][_token]) {
             return IBondingCalculator(bondCalculator[_token]).valuation(_token, _amount);
         }

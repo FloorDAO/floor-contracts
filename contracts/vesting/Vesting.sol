@@ -114,7 +114,6 @@ contract VestingClaim is FloorAccessControlled {
 
         // Sense check the amount requested
         require(_amount > 0, "Nothing to claim");
-        require(redeemableForValue.mul(1e6) >= _amount, "Claim more than vested");
 
         // Transfer WETH from sender to treasury
         WETH.safeTransferFrom(msg.sender, address(this), _amount);
@@ -162,7 +161,7 @@ contract VestingClaim is FloorAccessControlled {
     /* ========== VIEW FUNCTIONS ========== */
 
     /**
-     * @notice view FLOOR claimable for address. WETH decimals (18).
+     * @notice view FLOOR claimable for address. FLOOR decimals (9).
      * @param _address address
      * @return uint256
      */

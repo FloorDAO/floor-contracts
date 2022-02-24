@@ -96,7 +96,7 @@ abstract contract NoteKeeper is INoteKeeper, FrontEndRewarder {
    * @param _sendgFLOOR  send payout as gFLOOR or sFLOOR
    * @return payout_     sum of payout sent, in gFLOOR
    */
-  function redeem(address _user, uint256[] memory _indexes, bool _sendgFLOOR) public override returns (uint256 payout_) {
+  function redeem(address _user, uint256[] memory _indexes, bool _sendgFLOOR) external override returns (uint256 payout_) {
     uint48 time = uint48(block.timestamp);
 
     for (uint256 i = 0; i < _indexes.length; i++) {
