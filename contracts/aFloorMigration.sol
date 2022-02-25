@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity 0.7.5;
 
-import "./interfaces/IERC20.sol";
+import "./libraries/SafeERC20.sol";
 import "./libraries/SafeMath.sol";
 import "./types/FloorAccessControlled.sol";
 
 contract AlphaFloorMigration is FloorAccessControlled {
+    using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
     uint256 public swapEndBlock;
@@ -35,7 +35,11 @@ contract AlphaFloorMigration is FloorAccessControlled {
         address _aFLOOR,
         uint256 _swapDuration
     ) public notInitialized() onlyGovernor {
+        require(_FLOOR != address(0), "_FLOOR: Zero address");
+        require(_aFLOOR != address(0), "_aFLOOR: Zero address");
+
         require(_swapDuration < 2_000_000, "swap duration too long");
+
         FLOOR = IERC20(_FLOOR);
         aFLOOR = IERC20(_aFLOOR);
         swapEndBlock = block.number.add(_swapDuration);
@@ -53,7 +57,7 @@ contract AlphaFloorMigration is FloorAccessControlled {
         );
         require(block.number < swapEndBlock, "swapping of aFLOOR has ended");
 
-        aFLOOR.transferFrom(msg.sender, address(this), _amount);
+        aFLOOR.safeTransferFrom(msg.sender, address(this), _amount);
         FLOOR.transfer(msg.sender, _amount);
     }
 

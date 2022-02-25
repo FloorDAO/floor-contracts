@@ -4,7 +4,6 @@ pragma abicoder v2;
 
 import "../libraries/SafeMath.sol";
 import "../libraries/FixedPoint.sol";
-import "../libraries/Address.sol";
 
 import "../interfaces/IBondingCalculator.sol";
 import "../interfaces/IXTokenWeth.sol";
@@ -17,8 +16,8 @@ contract NFTXXTokenWethCalculator is IBondingCalculator {
     using FixedPoint for *;
     using SafeMath for uint256;
 
-    INFTXLPStaking public nftxLpStaking;
-    ITreasury public treasury;
+    INFTXLPStaking public immutable nftxLpStaking;
+    ITreasury public immutable treasury;
 
     constructor(address _nftxLpStaking, address _treasury) {
         require(_nftxLpStaking != address(0), "Zero address: _nftxLpStaking");
