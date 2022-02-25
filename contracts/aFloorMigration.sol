@@ -55,9 +55,9 @@ contract AlphaFloorMigration is FloorAccessControlled {
     }
 
     /**
-      * @notice governor can withdraw any remaining FLOOR
+      * @notice governor can withdraw any remaining FLOOR.
       */
-    function withdraw(uint256 _amount) external onlyGovernor {
+    function withdraw() external onlyGovernor {
         uint256 amount = FLOOR.balanceOf(address(this));
         FLOOR.transfer(msg.sender, amount);
     }
