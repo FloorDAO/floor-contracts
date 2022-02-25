@@ -1,18 +1,16 @@
 const {ethers} = require("hardhat");
-const nftxInventoryStakingAddr = "0x05aD54B40e3be8252CB257f77d9301E9CB1A9470";
-const nftxLiquidityStakingAddr = "0xcd0dfb870A60C30D957b0DF1D180a236a55b5740";
-const punk = '0x286AaF440879dBeAF6AFec6df1f9bfC907101f9D';
-const punkWeeth = '0xE21724BCa797be59FF477431026602e12200023D';
-const weeth = '0x4F2645F3D8e2542076A49De3F505016DC0a496B0';
-
-// @note deploy calculators first and add to this script
+const nftxInventoryStakingAddr = "0x3E135c3E981fAe3383A5aE0d323860a34CfAB893";
+const nftxLiquidityStakingAddr = "0x688c3E4658B5367da06fd629E41879beaB538E37";
+const punk = '0x269616D549D7e8Eaa82DFb17028d0B212D11232A';
+const weth = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
+const aFloor = '0x0C3983165E9BcE0a9Bb43184CC4eEBb26dce48fA';
 
 async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deploying contracts to Mainnet with the account: " + deployer.address);
 
   const firstEpochNumber = "0";
-  const firstEpochTime = 1646067600; // 28th February 5pm UTC
+  const firstEpochTime = 1646164800; // 28th February 8pm UTC
   console.log("First epoch time:", firstEpochTime);
 
   const Authority = await ethers.getContractFactory("FloorAuthority");
@@ -31,6 +29,21 @@ async function main() {
 
   const FloorTreasury = await ethers.getContractFactory("FloorTreasury");
   const floorTreasury = await FloorTreasury.deploy(floor.address, "0", authority.address);
+
+  const NFTXXTokenCalculator = await ethers.getContractFactory("NFTXXTokenCalculator");
+  const nftxXTokenCalculator = await NFTXXTokenCalculator.deploy(
+    nftxInventoryStakingAddr,
+    floorTreasury.address
+  );
+
+  const NFTXXTokenWethCalculator = await ethers.getContractFactory("NFTXXTokenWethCalculator");
+  const nftxXTokenWethCalculator = await NFTXXTokenWethCalculator.deploy(
+    nftxLiquidityStakingAddr,
+    floorTreasury.address
+  );
+
+  const BondingCalculator = await ethers.getContractFactory("TokenWethCalculator");
+  const bondingCalculator = await BondingCalculator.deploy(punk, weth, 50000); // 50% of SLP reserves value
 
   const NftxAllocator = await ethers.getContractFactory("NFTXAllocator");
   const nftxAllocator = await NftxAllocator.deploy(authority.address, nftxInventoryStakingAddr, nftxLiquidityStakingAddr, floorTreasury.address);
@@ -69,42 +82,15 @@ async function main() {
   const BondDepo = await ethers.getContractFactory("FloorBondDepository");
   const bondDepo = await BondDepo.deploy(authority.address, floor.address, gFLOOR.address, staking.address, floorTreasury.address);
 
-  // Enable Treasury permissions
-  console.log("Setting treasury permissions");
-  await floorTreasury.enable("2", "0x4F2645F3D8e2542076A49De3F505016DC0a496B0", "0x0000000000000000000000000000000000000000"); // WEETH as reserve asset
-  await floorTreasury.enable("2", "0x286AaF440879dBeAF6AFec6df1f9bfC907101f9D", "0x0000000000000000000000000000000000000000"); // PUNK as reserve asset
-  await floorTreasury.enable("8", "0x286AaF440879dBeAF6AFec6df1f9bfC907101f9D", "0x0000000000000000000000000000000000000000"); // PUNK as risk asset
-
-  await floorTreasury.enable("12", "0xeaeA4134D1fA90cdF506f669033Ecd24ec941F3a", "0xe7e0eED2511E9fa055b8923a0CE38e979e99435e"); // xPUNK as xToken
-  await floorTreasury.enable("12", "0x9120BcE55a8D8038DD45C033C0573389fC255bc4", "0xf0a8251AC171b76B2aE5D316C2353506D69c64dd"); // xPUNKWETH as xToken
-
-  await floorTreasury.enable("2", "0xeaeA4134D1fA90cdF506f669033Ecd24ec941F3a", "0x0000000000000000000000000000000000000000"); // xPUNK as reserve asset
-  await floorTreasury.enable("2", "0x9120BcE55a8D8038DD45C033C0573389fC255bc4", "0x0000000000000000000000000000000000000000"); // xPUNKWETH as reserve asset
-
-  await floorTreasury.enable("5", "0x1a8818eabe7f88f9c2a2dd39f2e7a9b55354f87a", "0x374488353cd9F438D2A11a78B5B0E91abF215Af2"); // PUNKWETH SLP as liquidity asset
-  await floorTreasury.enable("5", punkWeeth, "0x53cC90aDEC82d143Ea0f7a9E150c977FE6a96012"); // PUNKWEETH SLP  as liquidity asset
-  await floorTreasury.enable("0", "0x6ce798Bc8C8C93F3C312644DcbdD2ad6698622C5", "0x0000000000000000000000000000000000000000"); // Governor multi-sig
-  await floorTreasury.setRiskOffValuation("0x286AaF440879dBeAF6AFec6df1f9bfC907101f9D", "20000000000000");
-
-  await floorTreasury.enable("0", authority.governor(), "0x0000000000000000000000000000000000000000"); // Reserve Depositor
-  await floorTreasury.enable("0", bondDepo.address, "0x0000000000000000000000000000000000000000"); // Reserve Depositor
-  await floorTreasury.enable("9", bondDepo.address, "0x0000000000000000000000000000000000000000"); // Reward Manager
-  await floorTreasury.enable("9", distributor.address, "0x0000000000000000000000000000000000000000"); // Reward Manager
-  await floorTreasury.enable("13", nftxAllocator.address, "0x0000000000000000000000000000000000000000"); // Allocator
-  await floorTreasury.enable("0", nftxAllocator.address, "0x0000000000000000000000000000000000000000"); // Reserve Depositor
-
-  // @TODO set xtokens as reserve tokens
-
   console.log('Setting vault authority as', floorTreasury.address);
   await authority.pushVault(floorTreasury.address, true);
 
-  console.log('Deploying aFLOOR migration');
   const AFLOORMigration = await ethers.getContractFactory("AlphaFloorMigration");
-  const aFloorMigration = await AFLOORMigration.deploy();
+  const aFloorMigration = await AFLOORMigration.deploy(authority.address);
+  await aFloorMigration.initialize(floor.address, aFloor, 200000);
 
-  console.log('Deploying pFLOOR');
   const PFLOOR = await ethers.getContractFactory("VestingClaim");
-  const pFLOOR = await PFLOOR.deploy(floor.address, weeth, gFLOOR.address, floorTreasury.address, staking.address, authority.address);
+  const pFLOOR = await PFLOOR.deploy(floor.address, weth, gFLOOR.address, floorTreasury.address, staking.address, authority.address);
 
   console.log("FLOOR:", floor.address);
   console.log("gFLOOR:", gFLOOR.address);
@@ -120,12 +106,17 @@ async function main() {
 
   console.log("NFTXAllocator:", nftxAllocator.address);
 
-  console.log("Drip:", drip.address);
+  console.log("PunkWethCalculator:", bondingCalculator.address);
+  console.log("NFTXXTokenCalculator:", nftxXTokenCalculator.address);
+  console.log("NFTXXTokenWethCalculator:", nftxXTokenWethCalculator.address);
+
+  // Transfer authority to DAO
+  authority.pushGovernor("0xA9d93A5cCa9c98512C8C56547866b1db09090326", true);
+  authority.pushGuardian("0xA9d93A5cCa9c98512C8C56547866b1db09090326", true);
+  authority.pushPolicy("0xEFbF837255F854f1e535441391B78114103E0888", true);
 
   console.log('Deployment complete');
 
-  // @note Post deployment setup Allocator staking and dividend info
-  // @note and initialize the treasury to implement the timelock
 }
 
 main()
