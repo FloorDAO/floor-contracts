@@ -118,7 +118,7 @@ async function main() {
 
   const AFLOORMigration = await ethers.getContractFactory("AlphaFloorMigration");
   const aFloorMigration = await AFLOORMigration.deploy(authority.address);
-  await aFloorMigration.initialize(floor.address, aFLOOR.address, 200000);
+  await aFloorMigration.initialize(floor.address, aFLOOR.address);
 
   const PFLOOR = await ethers.getContractFactory("VestingClaim");
   const pFLOOR = await PFLOOR.deploy(floor.address, weeth, gFLOOR.address, floorTreasury.address, staking.address, authority.address);

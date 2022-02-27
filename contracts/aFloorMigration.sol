@@ -9,8 +9,6 @@ contract AlphaFloorMigration is FloorAccessControlled {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
-    uint256 public swapEndBlock;
-
     IERC20 public FLOOR;
     IERC20 public aFLOOR;
     
@@ -32,17 +30,13 @@ contract AlphaFloorMigration is FloorAccessControlled {
 
     function initialize (
         address _FLOOR,
-        address _aFLOOR,
-        uint256 _swapDuration
+        address _aFLOOR
     ) public notInitialized() onlyGovernor {
         require(_FLOOR != address(0), "_FLOOR: Zero address");
         require(_aFLOOR != address(0), "_aFLOOR: Zero address");
 
-        require(_swapDuration < 2_000_000, "swap duration too long");
-
         FLOOR = IERC20(_FLOOR);
         aFLOOR = IERC20(_aFLOOR);
-        swapEndBlock = block.number.add(_swapDuration);
         isInitialized = true;
     }
 
@@ -55,17 +49,15 @@ contract AlphaFloorMigration is FloorAccessControlled {
             aFLOOR.balanceOf(msg.sender) >= _amount,
             "amount above user balance"
         );
-        require(block.number < swapEndBlock, "swapping of aFLOOR has ended");
 
         aFLOOR.safeTransferFrom(msg.sender, address(this), _amount);
         FLOOR.transfer(msg.sender, _amount);
     }
 
     /**
-      * @notice governor can withdraw any remaining FLOOR after swapEndBlock
+      * @notice governor can withdraw any remaining FLOOR.
       */
     function withdraw() external onlyGovernor {
-        require(block.number > swapEndBlock, "swapping of aFLOOR is ongoing");
         uint256 amount = FLOOR.balanceOf(address(this));
         FLOOR.transfer(msg.sender, amount);
     }
