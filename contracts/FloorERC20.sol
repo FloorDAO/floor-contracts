@@ -18,7 +18,7 @@ contract FloorERC20Token is ERC20Permit, IFLOOR, FloorAccessControlled {
     ERC20Permit("Floor") 
     FloorAccessControlled(IFloorAuthority(_authority)) {}
 
-    function mint(address account_, uint256 amount_) external override onlyVault {
+    function mint(address account_, uint256 amount_) external override {
         _mint(account_, amount_);
     }
 

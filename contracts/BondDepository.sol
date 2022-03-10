@@ -169,7 +169,7 @@ contract FloorBondDepository is IBondDepository, NoteKeeper {
     );
 
     // transfer payment to treasury
-    market.quoteToken.safeTransferFrom(msg.sender, address(treasury), _amount);
+    market.quoteToken.safeTransferFrom(msg.sender, address(treasury), _amount);  // TRANSFER_FROM_FAILED: onlyPolicy
 
     // if max debt is breached, the market is closed 
     // this a circuit breaker
