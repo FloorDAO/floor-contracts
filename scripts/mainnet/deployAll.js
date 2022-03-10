@@ -111,9 +111,9 @@ async function main() {
   console.log("NFTXXTokenWethCalculator:", nftxXTokenWethCalculator.address);
 
   // Transfer authority to DAO
-  authority.pushGovernor("0xA9d93A5cCa9c98512C8C56547866b1db09090326", true);
-  authority.pushGuardian("0xA9d93A5cCa9c98512C8C56547866b1db09090326", true);
-  authority.pushPolicy("0xEFbF837255F854f1e535441391B78114103E0888", true);
+  await authority.pushGuardian("0xA9d93A5cCa9c98512C8C56547866b1db09090326", true);
+  await authority.pushPolicy("0xEFbF837255F854f1e535441391B78114103E0888", true);
+  await authority.pushGovernor("0xA9d93A5cCa9c98512C8C56547866b1db09090326", true);
 
   console.log('Deployment complete');
 
