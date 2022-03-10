@@ -67,7 +67,7 @@ contract MintAndBond is IMintAndBond, ReentrancyGuard {
     (address vault, uint256 vaultBalance) = _mint721(vaultId, ids);
 
     // Bond ERC20 in FloorDAO
-    _bondVaultToken(bondId, amountToBond, maxPrice);
+    _bondVaultToken(bondId, amountToBond, maxPrice, to, vault);
 
     // Return remaining ERC20
     uint256 remaining = IERC20(vault).balanceOf(address(this));
@@ -87,7 +87,7 @@ contract MintAndBond is IMintAndBond, ReentrancyGuard {
     IERC721 erc721 = IERC721(assetAddress);
 
     for (uint256 i; i < length; ++i) {
-        erc721.transferFrom(msg.sender, vault, ids[i]);
+        erc721.transferFrom(msg.sender, address(this), ids[i]);
     }
 
     // Ignored for ERC721 vaults
@@ -100,8 +100,9 @@ contract MintAndBond is IMintAndBond, ReentrancyGuard {
     return (vault, balance);
   }
 
-  function _bondVaultToken(uint256 bondId, uint256 amountToBond, uint256 maxPrice) internal {
-    bondDepository.deposit(bondId, amountToBond, maxPrice, msg.sender, address(0)); 
+  function _bondVaultToken(uint256 bondId, uint256 amountToBond, uint256 maxPrice, address user, address token) internal {
+    IERC20(token).approve(address(bondDepository), amountToBond);
+    bondDepository.deposit(bondId, amountToBond, maxPrice, user, address(0)); 
   }
 
 }

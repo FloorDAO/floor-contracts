@@ -1,5 +1,5 @@
 const { expect } = require("chai");
-const { ethers, network } = require("hardhat");
+const { ethers } = require("hardhat");
 
 const { smock } = require("@defi-wonderland/smock");
 
@@ -33,13 +33,11 @@ describe("MintAndBond", function () {
     let tuneInterval = 60 * 60;
 
     let authority;
-    let dai, weth;
     let floor;
     let depository, bondDepository;
     let treasury;
     let gFLOOR;
     let staking;
-    let sFLOOR;
 
     let mintAndBondFactory;
 
@@ -77,17 +75,18 @@ describe("MintAndBond", function () {
 
         // Set up some tokens
         floor = await floorFactory.deploy(authority.address);
-        dai = await erc20Factory.deploy("Dai", "DAI", 18);
         weth = await erc20Factory.deploy("Weth", "WETH", 18);
         cryptopunk = await erc721Factory.deploy("CryptoPunk", "PUNK");
-        punk = await erc20Factory.deploy("Punk", "PUNK", 18);
+        // punk = await erc20Factory.deploy("Punk", "PUNK", 18);
 
         // Get the ContractFactory for the Treasury contract
         treasury = await treasuryFactory.deploy(floor.address, "0", authority.address);
 
+        await authority.pushVault(treasury.address, true);
+
         // Mint some floor to treasury
-        treasury.enable(2, floor.address, NULL_ADDRESS);
-        floor.mint(treasury.address, "10000000000000");
+        await treasury.enable(2, floor.address, NULL_ADDRESS);
+        await floor.mint(treasury.address, "10000000000000");
 
         // Deploy some gFLOOR (needed?)
         gFLOOR = await gFloorFactory.deploy("50000000000");
@@ -102,16 +101,7 @@ describe("MintAndBond", function () {
         );
 
         // Reward manager
-        treasury.enable(9, depository.address, NULL_ADDRESS);
-
-        // Create a bond
-        bondDepository = await depository.create(
-            dai.address,
-            [capacity, initialPrice, buffer],
-            [false, true],
-            [vesting, conclusion],
-            [depositInterval, tuneInterval]
-        );
+        await treasury.enable(9, depository.address, NULL_ADDRESS);
 
         // Create our NFTX factory and a vault instance. The vault instance is then passed
         // to the factory to be referenced in the `.vault()` method call.
@@ -123,6 +113,15 @@ describe("MintAndBond", function () {
 
         await nftxVaultFactory.setVault(nftxVault.address);
         await nftxVault.setAssetAddress(cryptopunk.address);
+
+        // Create a bond
+        bondDepository = await depository.create(
+          nftxVault.address,
+          [capacity, initialPrice, buffer],
+          [false, true],
+          [vesting, conclusion],
+          [depositInterval, tuneInterval]
+        );
 
         // Set up our Sushi router (this is the same as a Uniswap router)
         let sushiRouterFactory = await smock.mock("UniswapV2RouterMock");
@@ -138,11 +137,11 @@ describe("MintAndBond", function () {
         );
 
         // Give user alice 5 ERC721 tokens
-        cryptopunk.mint(alice.address, 0);
-        cryptopunk.mint(alice.address, 1);
-        cryptopunk.mint(alice.address, 2);
-        cryptopunk.mint(alice.address, 3);
-        cryptopunk.mint(alice.address, 4);
+        await cryptopunk.mint(alice.address, 0);
+        await cryptopunk.mint(alice.address, 1);
+        await cryptopunk.mint(alice.address, 2);
+        await cryptopunk.mint(alice.address, 3);
+        await cryptopunk.mint(alice.address, 4);
     });
 
 
@@ -156,12 +155,12 @@ describe("MintAndBond", function () {
 
         // We have to approve outside of the contract (??)
         await cryptopunk.connect(alice).setApprovalForAll(mintAndBond.address, true);
-        await dai.mint(alice.address, "100000000000000000000000");
-        await dai.connect(alice).approve(mintAndBond.address, "100000000000000000000000");
-
+        await nftxVault.mintCoins(alice.address, "100000000000000000000000");
+        await nftxVault.connect(alice).approve(mintAndBond.address, "100000000000000000000000");
+        const vaultId = await nftxVault.vaultId();
         // Try and mint too many IDs
         await mintAndBond.connect(alice).mintAndBond721(
-            await nftxVault.vaultId(),      // vaultId
+            vaultId,                        // vaultId
             [1, 2, 4],                      // ids
             '30000000000000000',            // amountToBond (0.03)
             parseInt(bondDepository.value), // bondId
