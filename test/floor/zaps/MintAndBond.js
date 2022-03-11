@@ -18,7 +18,7 @@ describe("MintAndBond", function () {
     let deployer, alice, bob, carol;
 
     // Set up our factories and contracts to deploy
-    let authFactory, depositoryFactory, erc20Factory, erc721Factory, floorFactory, gFloorFactory, treasuryFactory;
+    let authFactory, depositoryFactory, erc20Factory, erc721Factory, gFloorFactory, treasuryFactory, mintAndBondFactory;
 
     // Bond depository constructor variables
     let capacity = 10000e9;
@@ -32,15 +32,10 @@ describe("MintAndBond", function () {
     let depositInterval = 60 * 60 * 4;
     let tuneInterval = 60 * 60;
 
-    let authority;
-    let floor;
-    let depository, bondDepository;
-    let treasury;
-    let gFLOOR;
-    let staking;
+    // Set up our deployed contract variables
+    let authority, floor, depository, bondDepository, treasury, gFLOOR, staking;
 
-    let mintAndBondFactory;
-
+    // Set up our NFTX vault factories and contracts
     let nftxVaultFactoryFactory, nftxVaultFac;
     let nftxVaultFactory, nftxVault;
 
@@ -56,7 +51,6 @@ describe("MintAndBond", function () {
         erc20Factory = await smock.mock("MockERC20");
         erc721Factory = await ethers.getContractFactory("ERC721Mock");
         gFloorFactory = await smock.mock("MockGFloor");
-        floorFactory = await ethers.getContractFactory("FloorERC20Token");
         treasuryFactory = await ethers.getContractFactory("TreasuryMock");
         depositoryFactory = await ethers.getContractFactory("FloorBondDepository");
         staking = await smock.fake("IStaking");
@@ -75,7 +69,7 @@ describe("MintAndBond", function () {
         authority = await authFactory.deploy(deployer.address, deployer.address, deployer.address, deployer.address);
 
         // Set up some tokens
-        floor = await floorFactory.deploy(authority.address);
+        floor = await erc20Factory.deploy("Floor", "FLOOR", 9);
         weth = await erc20Factory.deploy("Weth", "WETH", 18);
         cryptopunk = await erc721Factory.deploy("CryptoPunk", "PUNK");
 
