@@ -124,10 +124,7 @@ describe("MintAndBond", function () {
         // Set up our Mint and Bond zap
         mintAndBond = await mintAndBondFactory.deploy(
             depository.address,
-            nftxVaultFactory.address,
-            sushiRouter.address,
-            weth.address,
-            treasury.address
+            nftxVaultFactory.address
         );
 
         // Give user alice 5 ERC721 tokens

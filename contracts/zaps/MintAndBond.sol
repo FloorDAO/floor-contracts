@@ -6,9 +6,6 @@ import "../interfaces/IERC721.sol";
 import "../interfaces/INFTXVault.sol";
 import "../interfaces/INFTXVaultFactory.sol";
 import "../interfaces/IMintAndBond.sol";
-import "../interfaces/ITreasury.sol";
-import "../interfaces/IUniswapV2Router.sol";
-import "../interfaces/IWETH.sol";
 
 import "../libraries/ReentrancyGuard.sol";
 import "../libraries/SafeERC20.sol";
@@ -19,29 +16,15 @@ contract MintAndBond is IMintAndBond, ReentrancyGuard {
 
   using SafeERC20 for IERC20;
   using SafeMath for uint256;
-  
-  IWETH public immutable WETH;
-  INFTXVaultFactory public immutable nftxFactory;
-  IUniswapV2Router public immutable sushiRouter;
-  IBondDepository public immutable bondDepository;
-  ITreasury public immutable treasury;
 
-  uint256 constant BASE = 1e18;
+  INFTXVaultFactory public immutable nftxFactory;
+  IBondDepository public immutable bondDepository;
 
   event Bond721(uint256[] ids, address receiver);
 
-  constructor (
-    address _bondDepository,
-    address _nftxFactory,
-    address _sushiRouter,
-    address _WETH,
-    address _treasury
-  ) {
-    WETH = IWETH(_WETH);
-    treasury = ITreasury(_treasury);
-    nftxFactory = INFTXVaultFactory(_nftxFactory);
-    sushiRouter = IUniswapV2Router(_sushiRouter);
+  constructor (address _bondDepository, address _nftxFactory) {
     bondDepository = IBondDepository(_bondDepository);
+    nftxFactory = INFTXVaultFactory(_nftxFactory);
   }
 
   // Mints the 721s in NFTX and bonds the returned vault tokens
@@ -67,19 +50,21 @@ contract MintAndBond is IMintAndBond, ReentrancyGuard {
 
     // Convert ERC721 to ERC20
     // The vault is an ERC20 in itself and can be used to transfer and manage
-    (address vault, uint256 vaultBalance) = _mint721(vaultId, ids, to);
+    address vault = _mint721(vaultId, ids, to);
+    IERC20 vaultToken = IERC20(vault);
 
     // Bond ERC20 in FloorDAO
-    _bondVaultToken(bondId, amountToBond, maxPrice, to, vault);
+    vaultToken.approve(address(bondDepository), amountToBond);
+    bondDepository.deposit(bondId, amountToBond, maxPrice, to, address(0));
 
     // Return remaining ERC20
-    uint256 remaining = IERC20(vault).balanceOf(address(this));
-    IERC20(vault).safeTransfer(to, remaining);
+    uint256 remaining = vaultToken.balanceOf(address(this));
+    vaultToken.safeTransfer(to, remaining);
 
     emit Bond721(ids, to);
   }
 
-  function _mint721(uint256 vaultId, uint256[] memory ids, address from) internal returns (address, uint256) {
+  function _mint721(uint256 vaultId, uint256[] memory ids, address from) internal returns (address) {
     // Get our vault by ID
     address vault = nftxFactory.vault(vaultId);
 
@@ -97,15 +82,7 @@ contract MintAndBond is IMintAndBond, ReentrancyGuard {
     uint256[] memory emptyIds;
     INFTXVault(vault).mint(ids, emptyIds);
 
-    uint256 count = ids.length;
-    uint256 balance = (count * BASE) - (count * INFTXVault(vault).mintFee()); 
-    
-    return (vault, balance);
-  }
-
-  function _bondVaultToken(uint256 bondId, uint256 amountToBond, uint256 maxPrice, address user, address token) internal {
-    IERC20(token).approve(address(bondDepository), amountToBond);
-    bondDepository.deposit(bondId, amountToBond, maxPrice, user, address(0)); 
+    return vault;
   }
 
 }
