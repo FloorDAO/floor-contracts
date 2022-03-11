@@ -73,10 +73,12 @@ contract MintAndBond is IMintAndBond, ReentrancyGuard {
     uint256 length = ids.length;
 
     IERC721 erc721 = IERC721(assetAddress);
-
     for (uint256 i; i < length; ++i) {
       erc721.transferFrom(from, address(this), ids[i]);
     }
+
+    // Approve tokens to be used by vault
+    erc721.setApprovalForAll(vault, true);
 
     // Ignored for ERC721 vaults
     uint256[] memory emptyIds;
