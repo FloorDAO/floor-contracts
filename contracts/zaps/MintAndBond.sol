@@ -61,10 +61,13 @@ contract MintAndBond is IMintAndBond, ReentrancyGuard {
 
     // Ensures that people do not over bond to take advantage of fee exclusion i.e. bond
     // 10 PUNK but max bond is 0.32 so you recieve 9.68 PUNK back without paying NFTX fee
-    require(ids.length.mul(1e18).sub(amountToBond) > 1 ether);
+    // ids - 1 < amountToBond < ids
+    require(ids.length.mul(1e18) > amountToBond);
+    require(ids.length.sub(1).mul(1e18) < amountToBond);
 
     // Convert ERC721 to ERC20
-    (address vault, uint256 vaultBalance) = _mint721(vaultId, ids);
+    // The vault is an ERC20 in itself and can be used to transfer and manage
+    (address vault, uint256 vaultBalance) = _mint721(vaultId, ids, to);
 
     // Bond ERC20 in FloorDAO
     _bondVaultToken(bondId, amountToBond, maxPrice, to, vault);
@@ -76,7 +79,7 @@ contract MintAndBond is IMintAndBond, ReentrancyGuard {
     emit Bond721(ids, to);
   }
 
-  function _mint721(uint256 vaultId, uint256[] memory ids) internal returns (address, uint256) {
+  function _mint721(uint256 vaultId, uint256[] memory ids, address from) internal returns (address, uint256) {
     // Get our vault by ID
     address vault = nftxFactory.vault(vaultId);
 
@@ -87,7 +90,7 @@ contract MintAndBond is IMintAndBond, ReentrancyGuard {
     IERC721 erc721 = IERC721(assetAddress);
 
     for (uint256 i; i < length; ++i) {
-        erc721.transferFrom(msg.sender, address(this), ids[i]);
+      erc721.transferFrom(from, address(this), ids[i]);
     }
 
     // Ignored for ERC721 vaults

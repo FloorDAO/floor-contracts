@@ -46,7 +46,7 @@ describe("MintAndBond", function () {
 
 
     /**
-     * ..
+     * Set up our contract factories just the once to save time.
      */
 
     before(async function () {
@@ -66,7 +66,8 @@ describe("MintAndBond", function () {
 
 
     /**
-     * ..
+     * Set up our environment and contracts fresh for each test to prevent
+     * any cross-test contamination.
      */
 
     beforeEach(async function () {
@@ -77,7 +78,6 @@ describe("MintAndBond", function () {
         floor = await floorFactory.deploy(authority.address);
         weth = await erc20Factory.deploy("Weth", "WETH", 18);
         cryptopunk = await erc721Factory.deploy("CryptoPunk", "PUNK");
-        // punk = await erc20Factory.deploy("Punk", "PUNK", 18);
 
         // Get the ContractFactory for the Treasury contract
         treasury = await treasuryFactory.deploy(floor.address, "0", authority.address);
@@ -142,71 +142,127 @@ describe("MintAndBond", function () {
         await cryptopunk.mint(alice.address, 2);
         await cryptopunk.mint(alice.address, 3);
         await cryptopunk.mint(alice.address, 4);
+
+        // Confirm our user owns the expected 5 ERC721s
+        expect(await cryptopunk.balanceOf(alice.address)).to.equal(5);
     });
 
 
     /**
-     * ..
+     * Test that a user will not be able to trade their tokens without first approving
+     * the mint and bond contract to use them.
+     */
+
+    it("Should not allow unapproved tokens to `MintAndBond`", async function () {
+        // Try and mint without approval
+        await expect(
+            mintAndBond.connect(alice).mintAndBond721(
+                await nftxVault.vaultId(),      // vaultId
+                [1, 2, 4],                      // ids
+                '30000000000000000',            // amountToBond (0.03)
+                parseInt(bondDepository.value), // bondId
+                alice.address,                  // to
+                '31000000000000000'             // maxPrice (0.031)
+            )
+        ).to.be.reverted
+    });
+
+
+    /**
+     * Test that a user will not be able to deposit with an insufficient bond amount.
      */
 
     it("Should not be able to mint with too little `amountToBond`", async function () {
-        // Confirm our user owns the expected 5 ERC721s
-        expect(await cryptopunk.balanceOf(alice.address)).to.equal(5);
-
-        // We have to approve outside of the contract (??)
+        // We have to approve outside of the contract
         await cryptopunk.connect(alice).setApprovalForAll(mintAndBond.address, true);
-        await nftxVault.mintCoins(alice.address, "100000000000000000000000");
-        await nftxVault.connect(alice).approve(mintAndBond.address, "100000000000000000000000");
-        const vaultId = await nftxVault.vaultId();
+
         // Try and mint too many IDs
-        await mintAndBond.connect(alice).mintAndBond721(
-            vaultId,                        // vaultId
-            [1, 2, 4],                      // ids
-            '30000000000000000',            // amountToBond (0.03)
-            parseInt(bondDepository.value), // bondId
-            alice.address,                  // to
-            '31000000000000000'             // maxPrice (0.031)
-        )
+        await expect(
+            mintAndBond.connect(alice).mintAndBond721(
+                await nftxVault.vaultId(),      // vaultId
+                [1, 2, 4],                      // ids
+                '30000000000000000',            // amountToBond (0.03)
+                parseInt(bondDepository.value), // bondId
+                alice.address,                  // to
+                '31000000000000000'             // maxPrice (0.031)
+            )
+        ).to.be.reverted
     });
 
-    xit("Should not be able to bond with un-owned ERC721", async function () {
+
+    /**
+     * Test that a user will not be able to deposit with an excessive bond amount.
+     */
+
+    it("Should not be able to mint with too much `amountToBond`", async function () {
+        // We have to approve outside of the contract
+        await cryptopunk.connect(alice).setApprovalForAll(mintAndBond.address, true);
+
+        // Try and mint too many IDs
+        await expect(
+            mintAndBond.connect(alice).mintAndBond721(
+                await nftxVault.vaultId(),      // vaultId
+                [1, 2, 4],                      // ids
+                '3100000000000000000',          // amountToBond (3.1)
+                parseInt(bondDepository.value), // bondId
+                alice.address,                  // to
+                '3110000000000000000'           // maxPrice (3.11)
+            )
+        ).to.be.reverted
+    });
+
+
+    /**
+     * Test that a user will not be able to deposit tokens that they do not have
+     * ownership of.
+     */
+
+    it("Should not be able to bond with un-owned ERC721", async function () {
         // Try to mint and bond an ID that user does not own
-        await mintAndBond.mintAndBond721(
-            await nftxVault.vaultId(),  // vaultId
-            [3],                        // ids
-            '10000000000000000',        // amountToBond (0.01)
-            parseInt(bondDepository.value),             // bondId
-            bob.address,                // to
-            '11000000000000000'         // maxPrice (0.011)
-        )
+        await expect(
+            mintAndBond.mintAndBond721(
+                await nftxVault.vaultId(),      // vaultId
+                [3],                            // ids
+                '0900000000000000000',          // amountToBond (0.90)
+                parseInt(bondDepository.value), // bondId
+                bob.address,                    // to
+                '0910000000000000000'           // maxPrice (0.91)
+            )
+        ).to.be.reverted
     });
 
 
-    xit("Should be able to mint and bond a valid ERC721", async function () {
-        // Give a user 5 ERC721 tokens
+    /**
+     * Test our happy path to mint and bond a valid ERC721
+     */
 
-        // Give user some ETH
+    it("Should be able to mint and bond a valid ERC721", async function () {
+        // We have to approve outside of the contract
+        await cryptopunk.connect(alice).setApprovalForAll(mintAndBond.address, true);
 
         // Confirm we can mint and bond with correct amount to bond
-        await mintAndBond.mintAndBond721(
-            await nftxVault.vaultId(),  // vaultId
-            [1, 2, 4],                  // ids
-            '2030000000000000000',      // amountToBond (2.03)
-            parseInt(bondDepository.value),             // bondId
-            alice.address,              // to
-            '2031000000000000000'       // maxPrice (2.031)
-        )
+        expect(
+            await mintAndBond.mintAndBond721(
+                await nftxVault.vaultId(),      // vaultId
+                [1, 4],                         // ids
+                '1500000000000000000',          // amountToBond (1.5)
+                parseInt(bondDepository.value), // bondId
+                alice.address,                  // to
+                '1510000000000000000'           // maxPrice (1.51)
+            )
+        ).to.emit(mintAndBond, 'Bond721').withArgs([1, 4], alice.address);
 
-        // Confirm user no longer has specified ERC721s
+        // Confirm updated ownership of ERC721s
+        expect(await cryptopunk.balanceOf(alice.address)).to.equal(3)
+        expect(await cryptopunk.balanceOf(mintAndBond.address)).to.equal(2)
 
-        // Confirm user still has 3 and 5
+        expect(await cryptopunk.ownerOf(0)).to.equal(alice.address);
+        expect(await cryptopunk.ownerOf(1)).to.equal(mintAndBond.address);
+        expect(await cryptopunk.ownerOf(2)).to.equal(alice.address);
+        expect(await cryptopunk.ownerOf(3)).to.equal(alice.address);
+        expect(await cryptopunk.ownerOf(4)).to.equal(mintAndBond.address);
 
-        // Confirm ERC20 returned
-
-        // Confirm vault holds the ERC721s
-
-        // Confirm bond depository holdings
-
+        expect(await nftxVault.balanceOf(alice.address)).to.equal("500000000000000000");
     });
 
 });
