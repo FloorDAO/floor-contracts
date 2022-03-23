@@ -80,6 +80,15 @@ interface IBondDepository {
   function liveMarkets() external view returns (uint256[] memory);
   function liveMarketsFor(address _quoteToken) external view returns (uint256[] memory);
   function payoutFor(uint256 _amount, uint256 _bid) external view returns (uint256);
+  function markets(uint256 _bid) external view returns (
+    uint256 capacity,
+    IERC20 quoteToken,
+    bool capacityInQuote,
+    uint64 totalDebt,
+    uint64 maxPayout,
+    uint64 sold,
+    uint256 purchased
+  );
   function marketPrice(uint256 _bid) external view returns (uint256);
   function currentDebt(uint256 _bid) external view returns (uint256);
   function debtRatio(uint256 _bid) external view returns (uint256);
