@@ -72,21 +72,29 @@ contract MintAndBondZap is IMintAndBond, ReentrancyGuard, FloorAccessControlled 
     uint256 amountToBond = (maxBond > _ids.length.mul(1e18))
       ? _ids.length.mul(1e18)
       : maxBond;
+    
+    // Get our vault by ID
+    address vault = nftxFactory.vault(_vaultId);
+    IERC20 vaultToken = IERC20(vault);
+
+    // Store initial balance
+    uint256 existingBalance = vaultToken.balanceOf(address(this));
 
     // Convert ERC721 to ERC20
     // The vault is an ERC20 in itself and can be used to transfer and manage
-    address vault = _mint721(_vaultId, _ids, _to);
-    IERC20 vaultToken = IERC20(vault);
-
+    _mint721(vault, _ids, _to);
+    
     // Bond ERC20 in FloorDAO
     if (vaultToken.allowance(address(this), address(bondDepository)) < type(uint256).max) {
       vaultToken.approve(address(bondDepository), type(uint256).max);
     }
     bondDepository.deposit(_bondId, amountToBond, _maxPrice, _to, address(0));
 
-    // Add remaining ERC20 to timelock
-    remaining_ = vaultToken.balanceOf(address(this));
-    _addToTimelock(vault, remaining_, _to);
+    // Calculate remaining from initial balance and timelock
+    remaining_ = vaultToken.balanceOf(address(this)).sub(existingBalance);
+    if (remaining_ > 0) {
+      _addToTimelock(vault, remaining_, _to);
+    }
   }
 
   /**
@@ -149,10 +157,7 @@ contract MintAndBondZap is IMintAndBond, ReentrancyGuard, FloorAccessControlled 
       );
   }
 
-  function _mint721(uint256 vaultId, uint256[] memory ids, address from) internal returns (address) {
-    // Get our vault by ID
-    address vault = nftxFactory.vault(vaultId);
-
+  function _mint721(address vault, uint256[] memory ids, address from) internal {
     // Transfer tokens to zap and mint to NFTX
     address assetAddress = INFTXVault(vault).assetAddress();
     uint256 length = ids.length;
@@ -168,8 +173,6 @@ contract MintAndBondZap is IMintAndBond, ReentrancyGuard, FloorAccessControlled 
     // Ignored for ERC721 vaults
     uint256[] memory emptyIds;
     INFTXVault(vault).mint(ids, emptyIds);
-
-    return vault;
   }
 
   function _addToTimelock(address _vault, uint256 _remaining, address _user) internal returns (uint256 index_) {

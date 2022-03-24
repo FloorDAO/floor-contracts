@@ -215,7 +215,7 @@ describe("MintAndBondZap", function () {
             await mintAndBond.mintAndBond721(
                 await nftxVault.vaultId(),      // vaultId
                 [1, 4],                         // ids
-                0,                              // bondId
+                1,                              // bondId
                 alice.address,                  // to
                 '1510000000000000000'           // maxPrice (1.51)
             )
@@ -247,7 +247,7 @@ describe("MintAndBondZap", function () {
         await mintAndBond.mintAndBond721(
           await nftxVault.vaultId(),      // vaultId
           [1, 2, 4],                      // ids
-          0,                              // bondId
+          1,                              // bondId
           alice.address,                  // to
           '1510000000000000000'           // maxPrice (1.51)
         )
