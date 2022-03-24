@@ -132,7 +132,7 @@ contract MintAndBondZap is IMintAndBond, ReentrancyGuard, FloorAccessControlled 
    * @notice prevents remaining vtokens from being immediately claimable
    * @param _timelock amount in 18 decimal
    */
-  function setTimelock(uint48 _timelock) external override onlyPolicy {
+  function setTimelock(uint48 _timelock) external override onlyGovernor {
     // protect against accidental/overflowing timelocks
     require(_timelock < 31560000, "Timelock is too long");
     timelock = _timelock;
