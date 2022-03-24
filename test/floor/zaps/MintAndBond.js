@@ -149,7 +149,7 @@ describe("MintAndBondZap", function () {
             authority.address,
             depository.address,
             nftxVaultFactory.address,
-            "300000000000000000" // 0.3
+            "604800" // 1 week
         );
 
         // Give user alice 5 ERC721 tokens
@@ -219,7 +219,7 @@ describe("MintAndBondZap", function () {
                 alice.address,                  // to
                 '1510000000000000000'           // maxPrice (1.51)
             )
-        ).to.emit(mintAndBond, 'Bond721').withArgs([1, 4], alice.address);
+        ).to.emit(mintAndBond, 'CreateNote');
 
         // Confirm updated ownership of ERC721s
         expect(await cryptopunk.balanceOf(alice.address)).to.equal(3)
@@ -251,7 +251,7 @@ describe("MintAndBondZap", function () {
           alice.address,                  // to
           '1510000000000000000'           // maxPrice (1.51)
         )
-      ).to.emit(mintAndBond, 'Bond721').withArgs([1, 2, 4], alice.address);
+      ).to.emit(mintAndBond, 'CreateNote');
 
       // Confirm updated ownership of ERC721s
       expect(await cryptopunk.balanceOf(alice.address)).to.equal(2)
@@ -269,8 +269,7 @@ describe("MintAndBondZap", function () {
     /**
      * Test our happy path to mint and bond a valid ERC721 limited by max deposit
      */
-
-    it("Should be reverted if min bond is too low", async function () {
+    it("Should be reverted if user tries to claim before timelock ends", async function () {
       // We have to approve outside of the contract
       await cryptopunk.connect(alice).setApprovalForAll(mintAndBond.address, true);
 
@@ -283,7 +282,34 @@ describe("MintAndBondZap", function () {
           alice.address,                     // to
           '1510000000000000000'              // maxPrice (1.51)
         )
-      ).to.be.revertedWith("Bond amount too small.");
+      ).to.emit(mintAndBond, 'CreateNote');
+
+      await expect(mintAndBond.claim(alice.address, [0], nftxVault.address)).to.be.revertedWith("Depository: note not matured");
+      
+    });
+
+    it("Should be succeed if user tries to claim after timelock ends", async function () {
+      // We have to approve outside of the contract
+      await cryptopunk.connect(alice).setApprovalForAll(mintAndBond.address, true);
+
+      // Confirm we can mint and bond with correct amount to bond
+      await expect(
+        mintAndBond.mintAndBond721(
+          await nftxVault.vaultId(),         // vaultId
+          [1, 2, 4],                         // ids
+          1,                                 // bondId
+          alice.address,                     // to
+          '1510000000000000000'              // maxPrice (1.51)
+        )
+      ).to.emit(mintAndBond, 'CreateNote');
+      
+      await network.provider.request({
+        method: "evm_increaseTime",
+        params: [604800]
+      });
+
+      await expect(mintAndBond.claim(alice.address, [0], nftxVault.address)).to.emit(mintAndBond, 'ClaimNote').withArgs(alice.address, [0], nftxVault.address);
+
     });
 
 });

@@ -1,5 +1,5 @@
 const {ethers} = require("hardhat");
-const token = '0x87931E7AD81914e7898d07c68F145fC0A553D8Fb';
+const token = '0x87931E7AD81914e7898d07c68F145fC0A553D8Fb'; // the paired token
 const weth = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
 
 async function main() {
