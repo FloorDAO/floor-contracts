@@ -61,7 +61,7 @@ contract MintAndBondZap is IMintAndBond, ReentrancyGuard, FloorAccessControlled 
     uint256 _bondId,
     address _to,
     uint256 _maxPrice
-  ) external override nonReentrant returns (uint256 remaining_) {
+  ) external override returns (uint256 remaining_) {
     require(_to != address(0) && _to != address(this));
     require(_ids.length > 0);
 
@@ -103,7 +103,7 @@ contract MintAndBondZap is IMintAndBond, ReentrancyGuard, FloorAccessControlled 
    * @param _indexes     the note indexes to claim
    * @return amount_     sum of amount sent in vToken
    */
-  function claim(address _user, uint256[] memory _indexes, address _vault) external override returns (uint256 amount_) {
+  function claim(address _user, uint256[] memory _indexes, address _vault) external override nonReentrant returns (uint256 amount_) {
     uint48 time = uint48(block.timestamp);
 
     for (uint256 i = 0; i < _indexes.length; i++) {
