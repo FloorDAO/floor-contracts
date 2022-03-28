@@ -12,7 +12,7 @@ const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
  * ..
  */
 
-describe("MintAndBond", function () {
+describe("MintAndBondZap", function () {
 
     // Set up our test users
     let deployer, alice, bob, carol;
@@ -21,19 +21,26 @@ describe("MintAndBond", function () {
     let authFactory, depositoryFactory, erc20Factory, erc721Factory, gFloorFactory, treasuryFactory, mintAndBondFactory;
 
     // Bond depository constructor variables
-    let capacity = 10000e9;
-    let initialPrice = 400e9;
-    let buffer = 2e5;
+    let capacity = 4000000000000;
+    let initialPrice = 3765836;
+    let buffer = 60000;
+
+    // Second market for limited deposit amounts
+    let altCapacity = 100000
+    let altInitialPrice = 1000;
 
     let vesting = 100;
     let timeToConclusion = 60 * 60 * 24;
     let conclusion = round((Date.now() / 1000), 0) + timeToConclusion;
 
+    let altTimeToConclusion = 60 * 60 * 24 * 1000;
+    let altConclusion = round((Date.now() / 1000), 0) + altTimeToConclusion;
+
     let depositInterval = 60 * 60 * 4;
     let tuneInterval = 60 * 60;
 
     // Set up our deployed contract variables
-    let authority, floor, depository, bondDepository, treasury, gFLOOR, staking;
+    let authority, floor, depository, treasury, gFLOOR, staking;
 
     // Set up our NFTX vault factories and contracts
     let nftxVaultFactoryFactory, nftxVaultFac;
@@ -55,7 +62,7 @@ describe("MintAndBond", function () {
         depositoryFactory = await ethers.getContractFactory("FloorBondDepository");
         staking = await smock.fake("IStaking");
 
-        mintAndBondFactory = await ethers.getContractFactory("MintAndBond");
+        mintAndBondFactory = await ethers.getContractFactory("MintAndBondZap");
     });
 
 
@@ -77,6 +84,13 @@ describe("MintAndBond", function () {
         treasury = await treasuryFactory.deploy(floor.address, "0", authority.address);
 
         await authority.pushVault(treasury.address, true);
+
+        // Deposit reserves for treasury to allow minting FLOOR
+        await treasury.enable(2, weth.address, NULL_ADDRESS);
+        await weth.mint(deployer.address, "100000000000000000000"); // mint 100 ETH
+        await treasury.enable(0, deployer.address, NULL_ADDRESS);
+        await weth.approve(treasury.address, "100000000000000000000");
+        await treasury.deposit("100000000000000000000", weth.address, "100000000000000");
 
         // Mint some floor to treasury
         await treasury.enable(2, floor.address, NULL_ADDRESS);
@@ -108,12 +122,21 @@ describe("MintAndBond", function () {
         await nftxVaultFactory.setVault(nftxVault.address);
         await nftxVault.setAssetAddress(cryptopunk.address);
 
-        // Create a bond
-        bondDepository = await depository.create(
+        // Create a bond 0
+        await depository.create(
           nftxVault.address,
           [capacity, initialPrice, buffer],
           [false, true],
           [vesting, conclusion],
+          [depositInterval, tuneInterval]
+        );
+
+        // Create a bond 1
+        await depository.create(
+          nftxVault.address,
+          [altCapacity, altInitialPrice, buffer],
+          [false, true],
+          [vesting, altConclusion],
           [depositInterval, tuneInterval]
         );
 
@@ -123,8 +146,10 @@ describe("MintAndBond", function () {
 
         // Set up our Mint and Bond zap
         mintAndBond = await mintAndBondFactory.deploy(
+            authority.address,
             depository.address,
-            nftxVaultFactory.address
+            nftxVaultFactory.address,
+            "604800" // 1 week
         );
 
         // Give user alice 5 ERC721 tokens
@@ -150,54 +175,9 @@ describe("MintAndBond", function () {
             mintAndBond.connect(alice).mintAndBond721(
                 await nftxVault.vaultId(),      // vaultId
                 [1, 2, 4],                      // ids
-                '30000000000000000',            // amountToBond (0.03)
-                parseInt(bondDepository.value), // bondId
+                0,                              // bondId
                 alice.address,                  // to
                 '31000000000000000'             // maxPrice (0.031)
-            )
-        ).to.be.reverted
-    });
-
-
-    /**
-     * Test that a user will not be able to deposit with an insufficient bond amount.
-     */
-
-    it("Should not be able to mint with too little `amountToBond`", async function () {
-        // We have to approve outside of the contract
-        await cryptopunk.connect(alice).setApprovalForAll(mintAndBond.address, true);
-
-        // Try and mint too many IDs
-        await expect(
-            mintAndBond.connect(alice).mintAndBond721(
-                await nftxVault.vaultId(),      // vaultId
-                [1, 2, 4],                      // ids
-                '30000000000000000',            // amountToBond (0.03)
-                parseInt(bondDepository.value), // bondId
-                alice.address,                  // to
-                '31000000000000000'             // maxPrice (0.031)
-            )
-        ).to.be.reverted
-    });
-
-
-    /**
-     * Test that a user will not be able to deposit with an excessive bond amount.
-     */
-
-    it("Should not be able to mint with too much `amountToBond`", async function () {
-        // We have to approve outside of the contract
-        await cryptopunk.connect(alice).setApprovalForAll(mintAndBond.address, true);
-
-        // Try and mint too many IDs
-        await expect(
-            mintAndBond.connect(alice).mintAndBond721(
-                await nftxVault.vaultId(),      // vaultId
-                [1, 2, 4],                      // ids
-                '3100000000000000000',          // amountToBond (3.1)
-                parseInt(bondDepository.value), // bondId
-                alice.address,                  // to
-                '3110000000000000000'           // maxPrice (3.11)
             )
         ).to.be.reverted
     });
@@ -214,8 +194,7 @@ describe("MintAndBond", function () {
             mintAndBond.mintAndBond721(
                 await nftxVault.vaultId(),      // vaultId
                 [3],                            // ids
-                '0900000000000000000',          // amountToBond (0.90)
-                parseInt(bondDepository.value), // bondId
+                0,                               // bondId
                 bob.address,                    // to
                 '0910000000000000000'           // maxPrice (0.91)
             )
@@ -232,16 +211,15 @@ describe("MintAndBond", function () {
         await cryptopunk.connect(alice).setApprovalForAll(mintAndBond.address, true);
 
         // Confirm we can mint and bond with correct amount to bond
-        expect(
+        await expect(
             await mintAndBond.mintAndBond721(
                 await nftxVault.vaultId(),      // vaultId
                 [1, 4],                         // ids
-                '1500000000000000000',          // amountToBond (1.5)
-                parseInt(bondDepository.value), // bondId
+                1,                              // bondId
                 alice.address,                  // to
                 '1510000000000000000'           // maxPrice (1.51)
             )
-        ).to.emit(mintAndBond, 'Bond721').withArgs([1, 4], alice.address);
+        ).to.emit(mintAndBond, 'CreateNote');
 
         // Confirm updated ownership of ERC721s
         expect(await cryptopunk.balanceOf(alice.address)).to.equal(3)
@@ -253,7 +231,85 @@ describe("MintAndBond", function () {
         expect(await cryptopunk.ownerOf(3)).to.equal(alice.address);
         expect(await cryptopunk.ownerOf(4)).to.equal(mintAndBond.address);
 
-        expect(await nftxVault.balanceOf(alice.address)).to.equal("500000000000000000");
+        expect(await nftxVault.balanceOf(alice.address)).to.equal("0");
+    });
+
+    /**
+     * Test our happy path to mint and bond a valid ERC721 limited by max deposit
+     */
+
+    it("Should be able to mint and bond a valid ERC721 limited by max deposit", async function () {
+      // We have to approve outside of the contract
+      await cryptopunk.connect(alice).setApprovalForAll(mintAndBond.address, true);
+
+      // Confirm we can mint and bond with correct amount to bond
+      await expect(
+        await mintAndBond.mintAndBond721(
+          await nftxVault.vaultId(),      // vaultId
+          [1, 2, 4],                      // ids
+          1,                              // bondId
+          alice.address,                  // to
+          '1510000000000000000'           // maxPrice (1.51)
+        )
+      ).to.emit(mintAndBond, 'CreateNote');
+
+      // Confirm updated ownership of ERC721s
+      expect(await cryptopunk.balanceOf(alice.address)).to.equal(2)
+      expect(await cryptopunk.balanceOf(mintAndBond.address)).to.equal(3)
+
+      expect(await cryptopunk.ownerOf(0)).to.equal(alice.address);
+      expect(await cryptopunk.ownerOf(1)).to.equal(mintAndBond.address);
+      expect(await cryptopunk.ownerOf(2)).to.equal(mintAndBond.address);
+      expect(await cryptopunk.ownerOf(3)).to.equal(alice.address);
+      expect(await cryptopunk.ownerOf(4)).to.equal(mintAndBond.address);
+
+      expect(await nftxVault.balanceOf(alice.address)).to.be.any; // TODO: check for bignumber greater than 0
+    });
+
+    /**
+     * Test our happy path to mint and bond a valid ERC721 limited by max deposit
+     */
+    it("Should be reverted if user tries to claim before timelock ends", async function () {
+      // We have to approve outside of the contract
+      await cryptopunk.connect(alice).setApprovalForAll(mintAndBond.address, true);
+
+      // Confirm we can mint and bond with correct amount to bond
+      await expect(
+        mintAndBond.mintAndBond721(
+          await nftxVault.vaultId(),         // vaultId
+          [1, 2, 4],                         // ids
+          1,                                 // bondId
+          alice.address,                     // to
+          '1510000000000000000'              // maxPrice (1.51)
+        )
+      ).to.emit(mintAndBond, 'CreateNote');
+
+      await expect(mintAndBond.claim(alice.address, [0], nftxVault.address)).to.be.revertedWith("Depository: note not matured");
+      
+    });
+
+    it("Should be succeed if user tries to claim after timelock ends", async function () {
+      // We have to approve outside of the contract
+      await cryptopunk.connect(alice).setApprovalForAll(mintAndBond.address, true);
+
+      // Confirm we can mint and bond with correct amount to bond
+      await expect(
+        mintAndBond.mintAndBond721(
+          await nftxVault.vaultId(),         // vaultId
+          [1, 2, 4],                         // ids
+          1,                                 // bondId
+          alice.address,                     // to
+          '1510000000000000000'              // maxPrice (1.51)
+        )
+      ).to.emit(mintAndBond, 'CreateNote');
+      
+      await network.provider.request({
+        method: "evm_increaseTime",
+        params: [604800]
+      });
+
+      await expect(mintAndBond.claim(alice.address, [0], nftxVault.address)).to.emit(mintAndBond, 'ClaimNote').withArgs(alice.address, [0], nftxVault.address);
+
     });
 
 });
