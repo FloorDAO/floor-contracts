@@ -8,7 +8,7 @@ async function main() {
   console.log("Deploying contracts to Rinkeby with the account: " + deployer.address);
 
   const MintAndBond = await ethers.getContractFactory("MintAndBondZap");
-  const mintAndBond = await MintAndBond.deploy(authority, floorBondDepository, nftxFactory, 604800); // 10 minute timelock
+  const mintAndBond = await MintAndBond.deploy(authority, floorBondDepository, nftxFactory, 604800); // 1 week timelock
 
   console.log("MintAndBondZap:", mintAndBond.address);
 

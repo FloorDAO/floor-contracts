@@ -12,7 +12,7 @@ describe("TokenWethCalculator", function () {
   let tokenWethCalculatorContract;
   let mockedPair;
 
-  let WETH;
+  let PUNK, WETH;
 
   // Store any user addresses we want to interact with
   let deployer;
@@ -56,11 +56,20 @@ describe("TokenWethCalculator", function () {
 
   it("Should prevent zero address contracts from being entered", async function () {
     expect(
-      tokenWethCalculatorContract.deploy(ethers.constants.AddressZero, 40_000)
+      tokenWethCalculatorContract.deploy(ethers.constants.AddressZero, WETH.address, 40_000)
+    ).to.be.revertedWith('Zero address: _token');
+
+    expect(
+      tokenWethCalculatorContract.deploy(PUNK.address, ethers.constants.AddressZero, 40_000)
     ).to.be.revertedWith('Zero address: _WETH');
 
+    // Set up our TokenWethCalculator
+    expect(
+      tokenWethCalculatorContract.deploy(ethers.constants.AddressZero, ethers.constants.AddressZero, 40_000)
+    ).to.be.revertedWith('Zero address: _token');
+
     // Run an await with a successful run to ensure we capture all previous revertedWith
-    await tokenWethCalculatorContract.deploy(WETH.address, 40_000);
+    await tokenWethCalculatorContract.deploy(PUNK.address, WETH.address, 40_000);
   });
 
 
@@ -70,7 +79,7 @@ describe("TokenWethCalculator", function () {
 
   it("Should return correct valuation based on percentage", async function () {
     // Set up our TokenWethCalculator at 40%
-    let tokenCalculator = await tokenWethCalculatorContract.deploy(WETH.address, 40_000);
+    let tokenCalculator = await tokenWethCalculatorContract.deploy(PUNK.address, WETH.address, 40_000);
     expect(await tokenCalculator.valuation(mockedPair.address, "1000000000000000000")).to.equal("11200000000000000000");
     expect(await tokenCalculator.valuation(mockedPair.address, "10000000000000000000")).to.equal("112000000000000000000");
     expect(await tokenCalculator.valuation(mockedPair.address, "25000000000000000000")).to.equal("280000000000000000000");
@@ -83,14 +92,14 @@ describe("TokenWethCalculator", function () {
     expect(await tokenCalculator.valuation(reversedMockedPair.address, "100000000000000000000")).to.equal("1120000000000000000000");
 
     // Set up our TokenWethCalculator at 25%
-    tokenCalculator = await tokenWethCalculatorContract.deploy(WETH.address, 25_000);
+    tokenCalculator = await tokenWethCalculatorContract.deploy(PUNK.address, WETH.address, 25_000);
     expect(await tokenCalculator.valuation(mockedPair.address, "1000000000000000000")).to.equal("7000000000000000000");
     expect(await tokenCalculator.valuation(mockedPair.address, "10000000000000000000")).to.equal("70000000000000000000");
     expect(await tokenCalculator.valuation(mockedPair.address, "25000000000000000000")).to.equal("175000000000000000000");
     expect(await tokenCalculator.valuation(mockedPair.address, "100000000000000000000")).to.equal("700000000000000000000");
 
     // Set up our TokenWethCalculator at 0%
-    tokenCalculator = await tokenWethCalculatorContract.deploy(WETH.address, 0);
+    tokenCalculator = await tokenWethCalculatorContract.deploy(PUNK.address, WETH.address, 0);
     expect(await tokenCalculator.valuation(mockedPair.address, "1000000000000000000")).to.equal("0");
     expect(await tokenCalculator.valuation(mockedPair.address, "10000000000000000000")).to.equal("0");
     expect(await tokenCalculator.valuation(mockedPair.address, "25000000000000000000")).to.equal("0");
