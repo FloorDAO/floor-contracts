@@ -57,6 +57,8 @@ contract VestingClaim is FloorAccessControlled {
     // maximum portion of supply can allocate. == 9%
     uint256 public maximumAllocated = 90000; 
 
+    uint64 public immutable vestingCliff = 1661990400; // 1st September 2022
+
     constructor(
       address _floor,
       address _weth,
@@ -86,6 +88,7 @@ contract VestingClaim is FloorAccessControlled {
      * @param _amount uint256 The amount being claimed in FLOOR (9 decimals)
      */
     function claim(address _to, uint256 _amount) external {
+        require(block.timestamp > vestingCliff, "Cliff timestamp not passed");
         // Convert our FLOOR input to WETH decimal accuracy
         FLOOR.safeTransfer(_to, _claim(_amount.mul(1e6)));
     }
