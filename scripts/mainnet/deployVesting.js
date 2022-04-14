@@ -1,11 +1,11 @@
 const {ethers} = require("hardhat");
 
-const floor = '0x128e771f137Dd7F088082a27Ba748a7b543325a5';
-const weth = '0x4F2645F3D8e2542076A49De3F505016DC0a496B0';
-const gFloor = '0x842E819AfB58c3EbD9583bD5ad970a25d3279936';
-const treasury = '0x8dd21297393c5A21973BcA4E11F826F60c48828d';
-const staking = '0x721D652481FA62221236614441Ff98d72D9edB72';
-const authority = '0x38AFE493B59eb500368aFcA243CB119EB28FDd12';
+const floor = '0xf59257E961883636290411c11ec5Ae622d19455e';
+const weth = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
+const gFloor = '0xb1cc59fc717b8d4783d41f952725177298b5619d';
+const treasury = '0x91E453f442d25523F42063E1695390e325076ca2';
+const staking = '0x759c6de5bca9ade8a1a2719a31553c4b7de02539';
+const authority = '0x618907e21898d0357f0a0bf0b112949b1530cbc1';
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -22,7 +22,7 @@ async function main() {
     treasury,
     staking,
     authority,
-    1681344000 // some time in 2023
+    1661990400 // September 1st
   );
 
   console.log("");
@@ -35,3 +35,4 @@ main()
     console.error(error);
     process.exit(1);
   });
+""
