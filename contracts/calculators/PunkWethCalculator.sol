@@ -8,18 +8,22 @@ import "../interfaces/IERC20.sol";
 import "../interfaces/IBondingCalculator.sol";
 import "../interfaces/IUniswapV2Pair.sol";
 
-contract TokenWethCalculator is IBondingCalculator {
+contract PunkWethCalculator is IBondingCalculator {
 
     using FixedPoint for *;
     using SafeMath for uint256;
 
+    IERC20 public token;  // Ensure this is public to be quried
     IERC20 internal immutable WETH;
     uint256 public immutable percent;
 
-    constructor(address _WETH, uint256 _percent) {
+    constructor(address _token, address _WETH, uint256 _percent) {
+        require(_token != address(0), "Zero address: _token");
         require(_WETH != address(0), "Zero address: _WETH");
 
+        token = IERC20(_token);
         WETH = IERC20(_WETH);
+
         percent = _percent;
     }
 
@@ -30,14 +34,17 @@ contract TokenWethCalculator is IBondingCalculator {
 
         uint256 reserve;
 
-        if (uniswapPair.token0() == address(WETH)) {
-            reserve = reserve0;
-        } else if (uniswapPair.token1() == address(WETH)) {
+        if (uniswapPair.token0() == address(token)) {
+            require(uniswapPair.token1() == address(WETH), "Invalid pair");
             reserve = reserve1;
+        } else if (uniswapPair.token1() == address(token)) {
+            require(uniswapPair.token0() == address(WETH), "Invalid pair");
+            reserve = reserve0;
         } else {
             revert("Invalid pair");
         }
 
+        // Always dealing with SLP (18 decimals)
         uint256 totalValue = reserve.mul(2).mul(percent).div(1e5);
         uint256 totalSupply = uniswapPair.totalSupply();
         uint256 share = amount_.mul(1e18).div(totalSupply);

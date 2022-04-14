@@ -1,4 +1,4 @@
-const { ethers, network } = require("hardhat");
+const { ethers } = require("hardhat");
 const { expect } = require("chai");
 const { smock } = require("@defi-wonderland/smock");
 
@@ -18,7 +18,7 @@ describe("Vesting", async () => {
      * This is the home for setup methods
      */
     beforeEach(async () => {
-        [deployer, alice, bob, carol] = await ethers.getSigners();
+        [deployer, alice, bob, carol, daniel, evelyn] = await ethers.getSigners();
 
         erc20Factory = await smock.mock("MockERC20");
         gFloorFactory = await smock.mock("MockGFloor");
@@ -42,7 +42,8 @@ describe("Vesting", async () => {
             _gFLOOR.address,
             _treasury.address,
             _staking.address,
-            _authority.address
+            _authority.address,
+            0 // instant vest
         );
 
         // Enable WETH as reserve token
@@ -210,6 +211,71 @@ describe("Vesting", async () => {
         await _floor.mint(_treasury.address, "10000000000000");
 
         expect(await vestingClaim.redeemableFor(carol.address)).to.equal("102000000000");
+    });
+
+    it("should allow a transfer and claim", async () => {
+      await _weth.mint(deployer.address, "10000000000000000000");
+      await _weth.approve(vestingClaim.address, _weth.balanceOf(deployer.address));
+      await _weth.approve(_treasury.address, _weth.balanceOf(deployer.address));
+      await _treasury.enable(0, deployer.address, ethers.constants.AddressZero)
+
+      // Give carol 10 WETH
+      await _weth.mint(carol.address, "10000000000000000000");
+
+      await _weth.connect(carol).approve(vestingClaim.address, _weth.balanceOf(carol.address));
+
+      // Put 100 WETH into the treasury to cover 100,000 FLOOR
+      await _weth.mint(_treasury.address, "100000000000000000000");
+
+      // Audit the reserves to generate corresponding FLOOR
+      await _treasury.auditReserves();
+
+      // Put 20,000 FLOOR in the treasury
+      await _floor.mint(_treasury.address, "20000000000000");
+
+      // At this point our treasury will have a totalReserves() value of 100 WETH and 20,000 FLOOR.
+      expect(await _weth.balanceOf(_treasury.address)).to.equal("100000000000000000000");
+      expect(await _floor.balanceOf(_treasury.address)).to.equal("20000000000000");
+
+      // Carol can only claim 1% of the total FLOOR which is 200 out of 20,000.
+      expect(await vestingClaim.redeemableFor(carol.address)).to.equal("200000000000");
+
+      let vesting_terms = await vestingClaim.terms(carol.address);
+      expect((vesting_terms.gClaimed).toString(), "0")
+
+      // Claim 20 FLOOR
+      await vestingClaim.connect(carol).claim(carol.address, "20000000000");
+
+      // The claim has added more FLOOR to the treasury so it won't be 0, but instead still 1%
+      // including the additional WETH from the claim.
+      expect(await vestingClaim.redeemableFor(carol.address)).to.equal("180200000000");
+
+      vesting_terms = await vestingClaim.terms(carol.address);
+      expect((vesting_terms.gClaimed).toString(), "20000000000000000000")
+
+      // Increase Carol max supply by increase the number of floor in circulation by 10,000. This
+      // will give her another potential to claim 100 FLOOR.
+      await _floor.mint(_treasury.address, "10000000000000");
+      
+      expect(await vestingClaim.redeemableFor(carol.address)).to.equal("280200000000");
+
+      // Carol now OTCs their pFLOOR amount to daniel
+      await vestingClaim.connect(carol).pushWalletChange(daniel.address);
+      // Evelyn tries to pull terms from carol
+      await expect (vestingClaim.connect(evelyn).pullWalletChange(carol.address)).to.be.revertedWith("Not authorized");
+      // Daniel pulls the terms from carol
+      await vestingClaim.connect(daniel).pullWalletChange(carol.address);
+
+      expect(await vestingClaim.redeemableFor(carol.address)).to.equal("0");
+      expect(await vestingClaim.redeemableFor(daniel.address)).to.equal("280200000000");
+
+      // Give daniel 10 WETH
+      await _weth.mint(daniel.address, "10000000000000000000");
+      await _weth.connect(daniel).approve(vestingClaim.address, _weth.balanceOf(daniel.address));
+      // Daniel claims on received terms      
+      await vestingClaim.connect(daniel).claim(daniel.address, "280200000000");
+      // 1% of the extra 280.2 FLOOR that entered circulation (2.802)
+      expect(await vestingClaim.redeemableFor(daniel.address)).to.equal("2802000000");
     });
 
 });

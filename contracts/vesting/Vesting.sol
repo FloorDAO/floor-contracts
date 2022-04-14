@@ -42,6 +42,7 @@ contract VestingClaim is FloorAccessControlled {
     IERC20 public immutable FLOOR;
     IERC20 public immutable WETH;
     IgFLOOR public immutable gFLOOR;
+    uint64 public immutable vestingCliff;
     ITreasury private immutable treasury;
     IStaking private immutable staking;
 
@@ -63,7 +64,8 @@ contract VestingClaim is FloorAccessControlled {
       address _gFLOOR,
       address _treasury,
       address _staking,
-      address _authority
+      address _authority,
+      uint64 _vestingCliff
     ) FloorAccessControlled(IFloorAuthority(_authority)) {
         require(_floor != address(0), "Zero address: FLOOR");
         FLOOR = IERC20(_floor);
@@ -75,6 +77,7 @@ contract VestingClaim is FloorAccessControlled {
         treasury = ITreasury(_treasury);
         require(_staking != address(0), "Zero address: Staking");
         staking = IStaking(_staking);
+        vestingCliff = _vestingCliff;
     }
 
     /* ========== MUTABLE FUNCTIONS ========== */
@@ -86,6 +89,7 @@ contract VestingClaim is FloorAccessControlled {
      * @param _amount uint256 The amount being claimed in FLOOR (9 decimals)
      */
     function claim(address _to, uint256 _amount) external {
+        require(block.timestamp > vestingCliff, "Cliff timestamp not passed");
         // Convert our FLOOR input to WETH decimal accuracy
         FLOOR.safeTransfer(_to, _claim(_amount.mul(1e6)));
     }
@@ -132,8 +136,8 @@ contract VestingClaim is FloorAccessControlled {
      * @param _oldAddress address
      */
     function pullWalletChange(address _oldAddress) external {
-        require(walletChange[_oldAddress] == msg.sender, "Old wallet did not push");
-        require(terms[msg.sender].percent != 0, "Wallet already exists");
+        require(walletChange[_oldAddress] == msg.sender, "Not authorized");
+        require(terms[msg.sender].percent == 0, "Wallet already exists");
         
         walletChange[_oldAddress] = address(0);
         terms[msg.sender] = terms[_oldAddress];
