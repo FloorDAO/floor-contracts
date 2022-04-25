@@ -7,7 +7,7 @@ import "../libraries/SafeERC20.sol";
 
 
 /** 
- * Mints into nftx and bonds maximum into floordao
+ * Allows for FLOOR to be swapped for sFLOOR.
  */
 
 contract StakeAndWrapZap {
@@ -23,11 +23,11 @@ contract StakeAndWrapZap {
 
 
   /** 
-   * @notice TODO
+   * @notice Sets up our contract with references to relevant existing contracts.
    *
-   * @param _staking     TODO
-   * @param _floor       TODO
-   * @param _sFloor      TODO
+   * @param _staking     FLOOR Staking contract
+   * @param _floor       Floor token
+   * @param _sFloor      sFloor token
    */
 
   constructor (address _staking, address _floor, address _sFloor) {
@@ -52,12 +52,12 @@ contract StakeAndWrapZap {
 
 
   /** 
-   * @notice TODO
+   * @notice Stakes FLOOR and returns sFLOOR to the requested user.
    *
-   * @param _to       The recipient of bond payout
-   * @param _amount   The max bond price to account for slippage
+   * @param _to       The recipient of payout
+   * @param _amount   Amount of FLOOR to stake
    *
-   * @return returnedAmount_ Remaining vtokens to send back to user
+   * @return returnedAmount_ sFloor sent to recipient
    */
 
   function stakeAndWrap(address _to, uint256 _amount) external returns (uint256 returnedAmount_) {
@@ -69,7 +69,7 @@ contract StakeAndWrapZap {
     // Stake the FLOOR transferred from sender without rebasing or claiming
     staking.stake(address(this), _amount, false, false);
     
-    // Return the amount of gFLOOR received by `_to`
+    // Return the amount of sFLOOR received by `_to`
     returnedAmount_ = staking.wrap(_to, _amount);
 
     // Emit our event for subgraph visibility
